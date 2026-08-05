@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.figranium/figranium-mcp",
+  "title": "Figranium MCP Server",
+  "description": "Exposes browser automation execution, task management, and schedules to AI agents.",
+  "version": "1.0.0",
+  "repository": {
+    "url": "https://github.com/figranium/figranium-mcp"
+  },
+  "packages": [
+    {
+      "registryType": "github",
+      "identifier": "figranium/figranium-mcp",
+      "transport": {
+        "type": "stdio"
+      },
+      "command": "npx",
+      "args": ["-y", "github:figranium/figranium-mcp"]
+    }
+  ]
+}
