@@ -28,7 +28,7 @@ A Model Context Protocol (MCP) server for [Figranium](https://github.com/figrani
 To clone and install dependencies:
 
 ```bash
-git clone https://github.com/figranium/figranium
+git clone https://github.com/figranium/figranium-mcp
 cd figranium-mcp
 npm install
 npm run build
