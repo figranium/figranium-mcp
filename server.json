@@ -11,8 +11,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/figranium/figranium-mcp",
-      "version": "0.1.0",
+      "identifier": "ghcr.io/figranium/figranium-mcp:0.2.0",
       "transport": {
         "type": "stdio"
       }
