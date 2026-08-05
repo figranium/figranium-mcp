@@ -22,10 +22,8 @@ jobs:
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
 
-      - name: Verify Manifest & OIDC Auth
-        run: |
-          mcp-publisher publish --dry-run .mcp/server.json || true
+      - name: Authenticate via GitHub Actions OIDC
+        run: mcp-publisher login github-actions
 
       - name: Publish Server Manifest
-        run: |
-          mcp-publisher publish .mcp/server.json
+        run: mcp-publisher publish server.json
