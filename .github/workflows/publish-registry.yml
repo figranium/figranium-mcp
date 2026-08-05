@@ -7,8 +7,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write # Required for GitHub OIDC authentication
+  id-token: write
   contents: read
+  packages: write # Grants permission to push to ghcr.io
 
 jobs:
   publish:
@@ -16,6 +17,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/figranium/figranium-mcp:0.1.0
+            ghcr.io/figranium/figranium-mcp:latest
 
       - name: Install mcp-publisher
         run: |
