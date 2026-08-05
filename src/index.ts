@@ -153,6 +153,26 @@ const CreateTaskSchema = z.object({
   schedule: TaskScheduleSchema.optional().describe("Task automatic execution schedule. Expected type: object.")
 }).describe("Reflects the full schema of a Figranium task creation payload.");
 
+const BrowserOpenSchema = z.object({
+  url: z.string().optional().describe("Initial URL to navigate to when the browser opens. Expected type: string. Example: 'https://example.com'"),
+  mode: z.enum(['headful', 'scrape', 'agent']).optional().default('headful').describe("Informational mode of browser. Expected type: string enum. Example: 'headful'"),
+  devTools: z.boolean().optional().default(false).describe("Whether to open DevTools automatically. Expected type: boolean. Example: false")
+}).describe("Configuration for launching or reattaching a managed browser session.");
+
+const InspectorHighlightSchema = z.object({
+  sessionId: z.string().optional().describe("Active session ID. Expected type: string. Example: 'sess_123'"),
+  url: z.string().optional().describe("Optional URL to navigate to. Expected type: string. Example: 'https://example.com'"),
+  targetHint: z.string().optional().describe("Optional target hint (e.g., text, selector) to highlight elements. Expected type: string. Example: 'login button'")
+}).describe("Configuration for highlighting or inspecting elements on the active session.");
+
+const TaskDeleteSchema = z.object({
+  taskId: z.string().describe("The unique ID of the task to delete. Expected type: string. Example: 'task_101'")
+}).describe("Configuration for deleting an existing automation task.");
+
+const TaskUpdateSchema = CreateTaskSchema.partial().extend({
+  taskId: z.string().describe("The unique ID of the task to update. Expected type: string. Example: 'task_101'")
+}).describe("Reflects the schema of a Figranium task update payload.");
+
 /**
  * Rich formatted JSON Schema of a Figranium Task
  */
@@ -428,6 +448,69 @@ const TASK_JSON_SCHEMA = {
   required: ["name", "url", "mode"]
 };
 
+const BROWSER_OPEN_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    url: {
+      type: "string",
+      description: "Initial URL to navigate to when the browser opens."
+    },
+    mode: {
+      type: "string",
+      enum: ["headful", "scrape", "agent"],
+      default: "headful",
+      description: "Informational mode of browser. Note: only headful is supported via the VNC stack."
+    },
+    devTools: {
+      type: "boolean",
+      default: false,
+      description: "Open DevTools automatically."
+    }
+  }
+};
+
+const INSPECTOR_HIGHLIGHT_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    sessionId: {
+      type: "string",
+      description: "The ID of the browser session to target."
+    },
+    url: {
+      type: "string",
+      description: "Optional URL to navigate to."
+    },
+    targetHint: {
+      type: "string",
+      description: "Optional text or hint to find and highlight target elements."
+    }
+  }
+};
+
+const TASK_DELETE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    taskId: {
+      type: "string",
+      description: "The unique ID of the task to delete."
+    }
+  },
+  required: ["taskId"]
+};
+
+const TASK_UPDATE_JSON_SCHEMA = {
+  type: "object",
+  description: "Exhaustive task update structure for Figranium automation tasks.",
+  properties: {
+    taskId: {
+      type: "string",
+      description: "The unique ID of the task to update."
+    },
+    ...TASK_JSON_SCHEMA.properties
+  },
+  required: ["taskId"]
+};
+
 const CREATE_TASK_DESCRIPTION = `
 Create a complete, fully-configured Figranium automation task including sequential action steps, state variables, anti-bot stealth mechanisms, and optional scheduling.
 
@@ -583,12 +666,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: TASK_JSON_SCHEMA,
       },
       {
+        name: "task_update",
+        description: "Update fields of an existing task on the Figranium server.",
+        inputSchema: TASK_UPDATE_JSON_SCHEMA,
+      },
+      {
+        name: "task_delete",
+        description: "Permanently delete a Figranium task by taskId.",
+        inputSchema: TASK_DELETE_JSON_SCHEMA,
+      },
+      {
         name: "task_list",
         description: "List all task IDs, names, and descriptions from Figranium.",
         inputSchema: {
           type: "object",
           properties: {},
         },
+      },
+      {
+        name: "browser_open",
+        description: "Launch or reattach a managed headful/interactive browser session.",
+        inputSchema: BROWSER_OPEN_JSON_SCHEMA,
+      },
+      {
+        name: "inspector_highlight",
+        description: "Activate inspect/highlight mode on an active browser session with optional selector hints.",
+        inputSchema: INSPECTOR_HIGHLIGHT_JSON_SCHEMA,
       },
       {
         name: "task_execute",
@@ -801,6 +904,118 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         // POST to Figranium's create task endpoint
         const response = await api.post("/api/tasks", taskPayload);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response.data, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "task_update": {
+        const parseResult = TaskUpdateSchema.safeParse(args || {});
+        if (!parseResult.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: formatZodError(parseResult.error),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const { taskId, ...updates } = parseResult.data;
+
+        // PATCH to Figranium's update task endpoint
+        const response = await api.patch(`/api/tasks/${encodeURIComponent(taskId)}`, updates);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response.data, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "task_delete": {
+        const parseResult = TaskDeleteSchema.safeParse(args || {});
+        if (!parseResult.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: formatZodError(parseResult.error),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const { taskId } = parseResult.data;
+
+        // DELETE to Figranium's delete task endpoint
+        const response = await api.delete(`/api/tasks/${encodeURIComponent(taskId)}`);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response.data, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "browser_open": {
+        const parseResult = BrowserOpenSchema.safeParse(args || {});
+        if (!parseResult.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: formatZodError(parseResult.error),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const payload = parseResult.data;
+
+        // POST to Figranium's browser open endpoint
+        const response = await api.post("/api/browser/open", payload);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response.data, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "inspector_highlight": {
+        const parseResult = InspectorHighlightSchema.safeParse(args || {});
+        if (!parseResult.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: formatZodError(parseResult.error),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const payload = parseResult.data;
+
+        // POST to Figranium's inspector highlight endpoint
+        const response = await api.post("/api/inspector/highlight", payload);
         return {
           content: [
             {
