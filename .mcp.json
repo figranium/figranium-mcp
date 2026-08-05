@@ -1,0 +1,9 @@
+{
+  "name": "figranium-mcp",
+  "title": "Figranium MCP Server",
+  "description": "Model Context Protocol server for Figranium, enabling LLM clients to interact with task execution and scheduling via STDIO transport.",
+  "version": "0.1.0",
+  "repository": "https://github.com/figranium/figranium-mcp",
+  "serverManifest": "server.json",
+  "packageManifest": "package.json"
+}
