@@ -1,12 +1,20 @@
+Here is the full, updated README wrapped in 4-backtick fences so all internal code blocks render cleanly without breaking Markdown formatting:
+
+```markdown
 # Figranium MCP Server
 
-A Model Context Protocol (MCP) server for [Figranium](https://github.com/figranium/figranium) built using `@modelcontextprotocol/sdk`. This server allows LLM clients (like Claude Desktop) to discover, execute, inspect, schedule, and programmatically create Figranium automation tasks.
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.figranium%2Ffigranium--mcp-blue)](https://registry.modelcontextprotocol.io)
+[![GHCR Container](https://img.shields.io/badge/GHCR-ghcr.io%2Ffigranium%2Ffigranium--mcp-green)](https://github.com/figranium/figranium-mcp/pkgs/container/figranium-mcp)
+
+A Model Context Protocol (MCP) server for [Figranium](https://github.com/figranium/figranium) built using `@modelcontextprotocol/sdk`. This server allows LLM clients (like Claude Desktop, Cursor, and Manus AI) to discover, execute, inspect, schedule, and programmatically create Figranium automation tasks via standard STDIO transport.
 
 ## Table of Contents
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
+- [Quick Start (Docker / OCI)](#quick-start-docker--oci)
+- [Client Integration](#client-integration)
+  - [Claude Desktop](#claude-desktop)
+  - [Cursor IDE](#cursor-ide)
+  - [Manus AI / Registry Clients](#manus-ai--registry-clients)
 - [Environment Variables](#environment-variables)
-- [Claude Desktop Integration](#claude-desktop-integration)
 - [Server-Wide System Instructions](#server-wide-system-instructions)
 - [Available Resources](#available-resources)
 - [Available Tools](#available-tools)
@@ -14,55 +22,42 @@ A Model Context Protocol (MCP) server for [Figranium](https://github.com/figrani
   - [Execution Operations](#execution-operations)
   - [Schedule Operations](#schedule-operations)
 - [Rich Input Diagnostics & Self-Correction](#rich-input-diagnostics--self-correction)
-- [Development](#development)
+- [Local Development & Source Build](#local-development--source-build)
 
 ---
 
-## Prerequisites
-- Node.js (v18 or higher recommended)
-- Figranium instance up and running.
-- A Figranium API Key (can be configured in your Figranium Settings page).
+## Quick Start (Docker / OCI)
 
-## Installation
-
-To clone and install dependencies:
+No Node.js runtime or repository clone is required. The official container image is published on GitHub Container Registry (`ghcr.io`).
 
 ```bash
-git clone https://github.com/figranium/figranium-mcp
-cd figranium-mcp
-npm install
-npm run build
+docker pull ghcr.io/figranium/figranium-mcp:latest
 ```
-
-## Environment Variables
-
-The server requires the following environment variables to interact with your Figranium instance:
-
-* `FIGRANIUM_BASE_URL`: The base URL of your Figranium server. Defaults to `http://localhost:11345`.
-* `FIGRANIUM_API_KEY`: The API key generated from Figranium settings to authorize requests.
 
 ---
 
-## Claude Desktop Integration
+## Client Integration
 
-To use this server with Claude Desktop, add the following configuration block to your `claude_desktop_config.json` file.
+### Claude Desktop
 
-### Finding your configuration file:
+Add the container configuration to your `claude_desktop_config.json`:
+
 * **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 * **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-### Configuration Block:
 
 ```json
 {
   "mcpServers": {
     "figranium": {
-      "command": "node",
+      "command": "docker",
       "args": [
-        "/absolute/path/to/figranium-mcp-server/dist/index.js"
+        "run",
+        "-i",
+        "--rm",
+        "ghcr.io/figranium/figranium-mcp:latest"
       ],
       "env": {
-        "FIGRANIUM_BASE_URL": "http://localhost:11345",
+        "FIGRANIUM_BASE_URL": "[http://host.docker.internal:11345](http://host.docker.internal:11345)",
         "FIGRANIUM_API_KEY": "your_figranium_api_key_here"
       }
     }
@@ -70,172 +65,125 @@ To use this server with Claude Desktop, add the following configuration block to
 }
 ```
 
-Make sure to replace `/absolute/path/to/figranium-mcp-server/dist/index.js` with the correct absolute path to the compiled `index.js` file on your machine, and configure your actual `FIGRANIUM_API_KEY` and `FIGRANIUM_BASE_URL`.
+> **Note for Local Hosts**: If your Figranium instance runs locally on your host machine, use `http://host.docker.internal:11345` so the Docker container can reach your host network.
+
+---
+
+### Cursor IDE
+
+Add via **Settings > Features > MCP > Add New MCP Server**:
+
+* **Name**: `figranium`
+* **Type**: `command`
+* **Command**: `docker run -i --rm -e FIGRANIUM_BASE_URL=http://host.docker.internal:11345 -e FIGRANIUM_API_KEY=your_key ghcr.io/figranium/figranium-mcp:latest`
+
+---
+
+### Manus AI / Registry Clients
+
+For environments supporting direct MCP Registry resolution, register using the server's official registry namespace:
+
+```text
+io.github.figranium/figranium-mcp
+```
+
+Clients reading from the registry will resolve the `ghcr.io` OCI identifier automatically.
+
+---
+
+## Environment Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `FIGRANIUM_BASE_URL` | Base URL of your running Figranium instance | `http://localhost:11345` |
+| `FIGRANIUM_API_KEY` | API Key generated in Figranium Settings | *(Required)* |
 
 ---
 
 ## Server-Wide System Instructions
 
-The server initializes with standard guidelines detailing the complete lifecycle of a Figranium task:
-1. **Task Creation**: Structuring name, starting URL, and mode (`scrape`, `agent`, or `headful`), and configuring realistic stealth mechanisms.
-2. **Step Sequence Construction**: Ordering action steps (e.g., `navigate`, `wait_selector`, `click`, `type`, `javascript`) and flow control.
-3. **Selector Strategy**: Focusing on robust selector structures (IDs, ARIA roles, classes) and fallback handling.
-4. **Execution and Variables**: Managing transient states via variables and overriding variable values during runs.
+The server initializes with embedded guidelines for LLM agents detailing the task lifecycle:
+1. **Task Creation**: Structuring name, starting URL, execution mode (`scrape`, `agent`, or `headful`), and stealth mechanisms.
+2. **Step Sequence Construction**: Ordering action steps (`navigate`, `wait_selector`, `click`, `type`, `javascript`) and execution flow.
+3. **Selector Strategy**: Preferring robust ARIA, ID, and semantic class selectors with fallback strategies.
+4. **Execution & Variables**: Injecting and overriding runtime context variables.
 
 ---
 
 ## Available Resources
 
-The server registers the following MCP Resources:
-
-### 1. `figranium://schemas/task-v1.json`
-* **Description**: Exposes the full, deeply-annotated JSON Schema specification of a Figranium task.
-* **MimeType**: `application/json`
-* **Purpose**: Allows LLMs and consuming agents to inspect the exact properties, sub-objects, array items, and constraints of a Figranium task on demand.
+### `figranium://schemas/task-v1.json`
+* **MIME Type**: `application/json`
+* **Description**: Exposes the complete JSON Schema specification of a Figranium task. Allows agents to dynamically inspect valid parameters and payload shapes.
 
 ---
 
 ## Available Tools
 
-The server registers standard Figranium operations as MCP tools:
-
 ### Task Operations
 
-#### 1. `create_task`
-* **Description**: Create a complete, fully-configured Figranium automation task including sequential action steps, state variables, anti-bot stealth mechanisms, and optional scheduling. Includes complete guidance on purpose, execution model, step types, selector strategy, and edge cases.
-* **Input Schema**: Full annotated JSON Schema matching `figranium://schemas/task-v1.json` (includes `name`, `url`, `mode`, `wait`, `stealth`, `actions`, `variables`, `extractionScript`, `extractionFormat`, etc.).
-* **Complex Example Payload**:
-  ```json
-  {
-    "name": "HackerNews Custom Scraper",
-    "url": "https://news.ycombinator.com",
-    "mode": "agent",
-    "wait": 3,
-    "rotateUserAgents": true,
-    "stealth": {
-      "allowTypos": true,
-      "cursorGlide": true,
-      "naturalTyping": true
-    },
-    "actions": [
-      {
-        "type": "wait_selector",
-        "selector": ".hnname"
-      },
-      {
-        "type": "click",
-        "selector": "a.hnmore"
-      },
-      {
-        "type": "wait",
-        "value": "2"
-      },
-      {
-        "type": "javascript",
-        "value": "return Array.from(document.querySelectorAll('.athing')).map(tr => ({ id: tr.id, title: tr.querySelector('.titleline > a')?.innerText, href: tr.querySelector('.titleline > a')?.href }));",
-        "varName": "hn_stories"
-      }
-    ],
-    "variables": {
-      "hn_stories": {
-        "type": "string",
-        "value": "[]"
-      }
-    },
-    "extractionFormat": "json"
-  }
-  ```
-
-#### 2. `task_list`
-* **Description**: Returns all task IDs, names, and descriptions from the Figranium server.
-* **Arguments**: None
-
-#### 3. `task_execute`
-* **Description**: Runs a saved task and returns its execution result.
-* **Arguments**:
-  - `taskId` (string, required): The unique identifier of the task.
-  - `variables` (object, optional): Key-value pairs (where keys and values are strings) representing execution variables.
-
----
+* **`create_task`**: Create a complete, fully-configured Figranium automation task including sequential action steps, state variables, anti-bot stealth mechanisms, and optional scheduling.
+* **`task_list`**: List all task IDs, names, and descriptions registered on the Figranium server.
+* **`task_execute`**: Run a saved task by `taskId` with optional variable overrides.
 
 ### Execution Operations
 
-#### 4. `execution_list`
-* **Description**: Returns a summary of all past automation execution records.
-* **Arguments**: None
-
----
+* **`execution_list`**: Retrieve a summary of past task execution logs and statuses.
 
 ### Schedule Operations
 
-#### 5. `schedule_list`
-* **Description**: Returns all tasks that have schedules configured (enabled or not) along with their configuration.
-* **Arguments**: None
-
-#### 6. `schedule_get_all_status`
-* **Description**: Get overall scheduler status and metadata for all schedules.
-* **Arguments**: None
-
-#### 7. `schedule_get_status`
-* **Description**: Retrieves the schedule status, resolved cron config, and next run time for a specific task.
-* **Arguments**:
-  - `taskId` (string, required): The task's unique ID.
-
-#### 8. `schedule_delete`
-* **Description**: Disables and removes the schedule configuration from a specific task.
-* **Arguments**:
-  - `taskId` (string, required): The task's unique ID.
-
-#### 9. `schedule_set`
-* **Description**: Creates or updates a schedule on a task.
-* **Arguments**:
-  - `taskId` (string, required): The task's unique ID.
-  - `enabled` (boolean, required): Whether the schedule is active.
-  - `scheduleMode` (string, required): Either `"cron"` or `"frequency"`.
-  - `cronExpression` (string, optional): A standard 5-field cron expression (minute hour day month weekday). Required if `scheduleMode` is `"cron"`.
-  - `frequency` (string, optional): One of `"interval"`, `"daily"`, `"weekly"`, or `"monthly"`. Required if `scheduleMode` is `"frequency"`.
-  - `intervalMinutes` (number, optional): Run interval in minutes (required if frequency is `"interval"`).
-  - `scheduleHour` (number, optional): Hour of execution (0–23) for daily/weekly/monthly frequencies.
-  - `scheduleMinute` (number, optional): Minute of execution (0–59) for daily/weekly/monthly frequencies.
-  - `daysOfWeek` (array of numbers, optional): Days of the week (0 = Sunday, 1 = Monday, etc.) for weekly frequency.
-  - `dayOfMonth` (number, optional): Day of the month (1–31) for monthly frequency.
-
-#### 10. `schedule_describe`
-* **Description**: Validates and previews/describes a schedule configuration without saving it.
-* **Arguments**:
-  - `taskId` (string, required): The task's unique ID.
-  - `scheduleMode` (string, required): Either `"cron"` or `"frequency"`.
-  - (Other optional schedule arguments matching those of `schedule_set`).
+* **`schedule_list`**: List all tasks with configured schedules.
+* **`schedule_get_all_status`**: Retrieve overall scheduler state and metadata.
+* **`schedule_get_status`**: Get active schedule details and next run time for a specific `taskId`.
+* **`schedule_set`**: Create or update a cron or frequency schedule on a task.
+* **`schedule_delete`**: Disable and remove a task schedule.
+* **`schedule_describe`**: Validate and preview a schedule configuration without applying it.
 
 ---
 
 ## Rich Input Diagnostics & Self-Correction
 
-If you supply invalid fields or parameters when calling `create_task`, the Figranium MCP Server automatically performs comprehensive validation via Zod and returns `isError: true` accompanied by precise step-by-step diagnostic information.
+If an invalid parameter payload is supplied to `create_task`, the server returns structured Zod diagnostic output (`isError: true`). This allows connected LLMs to analyze schema errors and attempt immediate self-correction.
 
-For example, if you configure a step of type `"click"` but specify an invalid sub-field, you will receive a diagnostic error like:
+Example response:
 ```text
 Schema Validation Failed!
 
 Detailed breakdown of validation errors:
  - At Step Index 2 (action step #3), parameter "type" failed validation: Invalid enum value. Expected 'click' | 'type' | 'wait' ..., received 'clikc'
-
-Please inspect the expected types and structure in figranium://schemas/task-v1.json and try again with the corrected payload.
 ```
-This precise pinpointing enables LLMs to perform immediate, autonomous self-correction without requiring human intervention.
 
 ---
 
-## Development
+## Local Development & Source Build
 
-To run the server in development mode with auto-recompile:
+If you wish to modify the source code or run without Docker:
+
+### Prerequisites
+* Node.js v18+
+* npm v9+
+
+### Build & Run
 
 ```bash
+# Clone repository
+git clone [https://github.com/figranium/figranium-mcp.git](https://github.com/figranium/figranium-mcp.git)
+cd figranium-mcp
+
+# Install dependencies and compile TypeScript
+npm install
+npm run build
+
+# Watch mode for active development
 npm run watch
 ```
 
-You can test interaction using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+### Testing with MCP Inspector
+
+Inspect server tools and resources using the official MCP debugging suite:
 
 ```bash
 npx @modelcontextprotocol/inspector node dist/index.js
+```
+
 ```
