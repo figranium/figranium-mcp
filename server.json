@@ -10,17 +10,12 @@
   },
   "packages": [
     {
-      "registryType": "npm",
-      "identifier": "figranium-mcp",
+      "registryType": "oci",
+      "identifier": "ghcr.io/figranium/figranium-mcp",
       "version": "0.1.0",
       "transport": {
         "type": "stdio"
-      },
-      "command": "npx",
-      "args": [
-        "-y",
-        "figranium-mcp@0.1.0"
-      ]
+      }
     }
   ]
 }
