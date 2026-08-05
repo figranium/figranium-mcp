@@ -10,15 +10,15 @@
   },
   "packages": [
     {
-      "registryType": "github",
-      "identifier": "figranium/figranium-mcp",
+      "registryType": "npm",
+      "identifier": "figranium-mcp",
       "transport": {
         "type": "stdio"
       },
       "command": "npx",
       "args": [
         "-y",
-        "github:figranium/figranium-mcp"
+        "figranium-mcp"
       ]
     }
   ]
