@@ -1,16 +1,20 @@
 {
-  "name": "figranium-mcp-server",
+  "name": "figranium-mcp",
   "version": "1.0.0",
-  "description": "MCP server for Figranium, wrapping task execution, past execution logs, and schedule management.",
+  "description": "MCP server for Figranium, wrapping task execution, scheduling, and automation orchestration.",
   "main": "dist/index.js",
   "bin": {
-    "figranium-mcp-server": "dist/index.js"
+    "figranium-mcp": "dist/index.js"
   },
   "type": "module",
+  "files": ["dist"],
   "scripts": {
     "build": "tsc",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build",
     "start": "node dist/index.js",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "postbuild": "node -e \"require('fs').chmodSync('./dist/index.js', 0o755)\""
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.1",

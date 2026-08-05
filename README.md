@@ -27,9 +27,33 @@ A Model Context Protocol (MCP) server for [Figranium](https://github.com/figrani
 
 No Node.js runtime or repository clone is required. The official container image is published on GitHub Container Registry (`ghcr.io`).
 
+Zero-config npm usage is also supported:
+
+```bash
+npx -y figranium-mcp
+```
+
+For local development:
+
+```bash
+git clone https://github.com/figranium/figranium-mcp
+dcd figranium-mcp
+npm install
+npm run build
+```
+
 ```bash
 docker pull ghcr.io/figranium/figranium-mcp:latest
 ```
+
+## Environment Variables
+
+The server requires the following environment variables to interact with your Figranium instance:
+
+* `FIGRANIUM_BASE_URL`: The base URL of your Figranium server. Defaults to `http://localhost:11345`.
+* `FIGRANIUM_API_KEY`: The API key generated from Figranium settings to authorize requests. This variable is required for startup.
+
+If `FIGRANIUM_API_KEY` is missing, the server prints a clear setup message and exits gracefully.
 
 ---
 
@@ -46,15 +70,10 @@ Add the container configuration to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "figranium": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "ghcr.io/figranium/figranium-mcp:latest"
-      ],
+      "command": "npx",
+      "args": ["-y", "figranium-mcp"],
       "env": {
-        "FIGRANIUM_BASE_URL": "[http://host.docker.internal:11345](http://host.docker.internal:11345)",
+        "FIGRANIUM_BASE_URL": "http://localhost:11345",
         "FIGRANIUM_API_KEY": "your_figranium_api_key_here"
       }
     }
@@ -62,38 +81,31 @@ Add the container configuration to your `claude_desktop_config.json`:
 }
 ```
 
-> **Note for Local Hosts**: If your Figranium instance runs locally on your host machine, use `http://host.docker.internal:11345` so the Docker container can reach your host network.
+> **Note for Local Hosts**: If your Figranium instance runs locally on your host machine,
+> use `http://localhost:11345` when running via `npx`.
 
 ---
 
-### Cursor IDE
+### Cursor Integration
 
-Add via **Settings > Features > MCP > Add New MCP Server**:
+Add the following to `~/.cursor/mcp.json`:
 
-* **Name**: `figranium`
-* **Type**: `command`
-* **Command**: `docker run -i --rm -e FIGRANIUM_BASE_URL=http://host.docker.internal:11345 -e FIGRANIUM_API_KEY=your_key ghcr.io/figranium/figranium-mcp:latest`
-
----
-
-### Manus AI / Registry Clients
-
-For environments supporting direct MCP Registry resolution, register using the server's official registry namespace:
-
-```text
-io.github.figranium/figranium-mcp
+```json
+{
+  "mcpServers": {
+    "figranium": {
+      "command": "npx",
+      "args": ["-y", "figranium-mcp"],
+      "env": {
+        "FIGRANIUM_BASE_URL": "http://localhost:11345",
+        "FIGRANIUM_API_KEY": "YOUR_API_KEY"
+      }
+    }
+  }
+}
 ```
 
-Clients reading from the registry will resolve the `ghcr.io` OCI identifier automatically.
-
----
-
-## Environment Variables
-
-| Variable | Description | Default |
-|---|---|---|
-| `FIGRANIUM_BASE_URL` | Base URL of your running Figranium instance | `http://localhost:11345` |
-| `FIGRANIUM_API_KEY` | API Key generated in Figranium Settings | *(Required)* |
+This lets Claude Desktop and Cursor launch the package directly without requiring a local build or a Docker bridge.
 
 ---
 
@@ -180,5 +192,5 @@ npm run watch
 Inspect server tools and resources using the official MCP debugging suite:
 
 ```bash
-npx @modelcontextprotocol/inspector node dist/index.js
+npx @modelcontextprotocol/inspector npx -y figranium-mcp
 ```

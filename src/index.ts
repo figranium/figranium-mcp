@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -12,7 +13,14 @@ import axios, { AxiosInstance } from "axios";
 import { z } from "zod";
 
 const BASE_URL = (process.env.FIGRANIUM_BASE_URL || "http://localhost:11345").replace(/\/+$/, "");
-const API_KEY = process.env.FIGRANIUM_API_KEY || "";
+const API_KEY = process.env.FIGRANIUM_API_KEY;
+
+if (!API_KEY) {
+  console.error("Missing required environment variable: FIGRANIUM_API_KEY.");
+  console.error("Set FIGRANIUM_API_KEY before running, or configure your editor integration.");
+  console.error("Example: FIGRANIUM_API_KEY=YOUR_API_KEY npx -y figranium-mcp");
+  process.exit(1);
+}
 
 // Create pre-configured Axios instance
 const api: AxiosInstance = axios.create({
