@@ -1,6 +1,3 @@
-Here is the full, updated README wrapped in 4-backtick fences so all internal code blocks render cleanly without breaking Markdown formatting:
-
-```markdown
 # Figranium MCP Server
 
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.figranium%2Ffigranium--mcp-blue)](https://registry.modelcontextprotocol.io)
@@ -184,6 +181,4 @@ Inspect server tools and resources using the official MCP debugging suite:
 
 ```bash
 npx @modelcontextprotocol/inspector node dist/index.js
-```
-
 ```
