@@ -3,7 +3,7 @@
   "name": "io.github.figranium/figranium-mcp",
   "title": "Figranium MCP",
   "description": "MCP server implementation for Figranium",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "source": "github",
     "url": "https://github.com/figranium/figranium-mcp.git"
@@ -11,7 +11,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/figranium/figranium-mcp:0.1.0",
+      "identifier": "ghcr.io/figranium/figranium-mcp:0.1.1",
       "transport": {
         "type": "stdio"
       }
