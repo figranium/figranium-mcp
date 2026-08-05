@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write # Automatically enables OIDC auth for mcp-publisher
+  id-token: write # Required to fetch the OIDC JWT
   contents: read
 
 jobs:
@@ -22,5 +22,14 @@ jobs:
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
 
-      - name: Publish Server Manifest
-        run: mcp-publisher publish server.json
+      - name: Fetch OIDC Token and Publish
+        run: |
+          # Fetch the OIDC bearer token from the GitHub Actions environment
+          OIDC_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://registry.modelcontextprotocol.io" | jq -r '.value')
+          
+          # Login using the OIDC token
+          mcp-publisher login github --token "$OIDC_TOKEN"
+          
+          # Publish manifest
+          mcp-publisher publish server.json
