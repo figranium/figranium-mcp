@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write # Required for GitHub OIDC authentication
+  id-token: write # Automatically enables OIDC auth for mcp-publisher
   contents: read
 
 jobs:
@@ -21,9 +21,6 @@ jobs:
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
-
-      - name: Authenticate via GitHub Actions OIDC
-        run: mcp-publisher login github-actions
 
       - name: Publish Server Manifest
         run: mcp-publisher publish server.json
