@@ -12,13 +12,14 @@
     {
       "registryType": "npm",
       "identifier": "figranium-mcp",
+      "version": "0.1.0",
       "transport": {
         "type": "stdio"
       },
       "command": "npx",
       "args": [
         "-y",
-        "figranium-mcp"
+        "figranium-mcp@0.1.0"
       ]
     }
   ]
