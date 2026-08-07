@@ -39,22 +39,32 @@ FIGRANIUM TASK LIFECYCLE SYSTEM INSTRUCTIONS
 As the Figranium MCP Server, you oversee and orchestrate the complete lifecycle of browser automation tasks.
 Every task follows a strict execution pipeline that you must carefully construct and validate:
 
-1. TASK CREATION:
+1. VARIABLE TEMPLATING SYNTAX (HIGH PRIORITY):
+   - You MUST use '{$variable_name}' (with a single curly brace and dollar sign, e.g. {$myVar}) for variable references/templating inside action values, URLs, headers, or body fields.
+   - NEVER use double curly braces like '{{variable_name}}' or JavaScript-style templates like '\${variable_name}', as these syntaxes are unsupported and will cause execution failures.
+   - Always ensure any template tokens resolve to valid declared variables.
+
+2. MANDATORY AUTOMATIC TESTING:
+   - UNLESS EXPLICITLY PROMPTED BY THE USER NOT TO TEST, you MUST immediately test and verify your newly created or updated tasks by calling the 'task_execute' tool right after calling 'create_task' or 'task_update'.
+   - Do not wait for additional user instructions to run/test the task; automatic testing is mandatory to ensure correctness.
+
+3. TASK CREATION:
    - A task must have a 'name', an initial starting 'url', and an execution 'mode' ('scrape', 'agent', or 'headful').
    - Fast, non-interactive tasks should use 'scrape' mode. Detailed, multi-step scenarios requiring mouse/keyboard simulation should use 'agent' mode. Visible, interactive debug sessions should use 'headful' mode.
    - Configure anti-bot stealth parameters under the 'stealth' object to simulate organic human browsing patterns (typos, curved mouse glides, randomize clicks).
 
-2. STEP SEQUENCE CONSTRUCTION (ACTIONS):
+4. STEP SEQUENCE CONSTRUCTION (ACTIONS):
    - You must organize automation steps sequentially in the 'actions' array.
    - Supported actions include page navigation ('navigate'), waiting ('wait', 'wait_selector'), element interaction ('click', 'type', 'hover', 'press'), script execution ('javascript'), control flow ('if', 'else', 'end', 'while', 'repeat', 'foreach'), and extraction ('csv', 'get_content').
    - For interactive elements, ensure a 'wait_selector' is performed BEFORE click/type actions to guarantee the DOM is ready.
+   - Always remember to close all opened block structures (e.g., 'if', 'while', 'repeat', 'foreach') with a corresponding 'end' action step.
 
-3. TARGET SELECTOR RESOLUTION:
+5. TARGET SELECTOR RESOLUTION:
    - Prefer highly resilient selector strategies: ID-based selectors (e.g. '#login-btn'), robust CSS classes, XPath, ARIA roles, or reliable text matchers.
    - Avoid brittle, highly nested selectors (like 'div > div > span > button') which break easily.
    - For nested elements, check if they reside inside Shadow DOMs, and ensure 'includeShadowDom' is set to true.
 
-4. EXECUTION HANDLING & MONITORING:
+6. EXECUTION HANDLING & MONITORING:
    - Dynamic parameters and transient states must be declared in 'variables' record object.
    - Execute tasks via 'task_execute' tool, passing variable values to override defaults.
    - Track executions using 'execution_list' or stream results. If an execution fails, inspect the step sequence, adjust the target selector or increase the 'wait' duration, and retry.
@@ -101,7 +111,7 @@ const ActionSchema = z.object({
     'start', 'http_request', 'get_content'
   ]).describe("The action type to perform. Expected type: string enum. Example: 'click'"),
   selector: z.string().optional().describe("CSS selector, XPath, or ARIA locator for the target element. Required for click, type, hover, wait_selector. Expected type: string. Example: '#username'"),
-  value: z.string().optional().describe("Input value or configuration value for this action. Used for typing text, script contents, or wait durations. Expected type: string. Example: 'hello@world.com'"),
+  value: z.string().optional().describe("Input value or configuration value for this action. Supports variable templating. MUST use '{$variable_name}' syntax for variable references (e.g., '{$myVar}'). NEVER use '{{variable_name}}' or '${variable_name}'. Expected type: string. Example: 'hello@world.com'"),
   key: z.string().optional().describe("The key name to press for 'press' actions, or config variable keys. Expected type: string. Example: 'Enter'"),
   disabled: z.boolean().optional().default(false).describe("Skip execution of this step if set to true. Expected type: boolean. Example: false"),
   varName: z.string().optional().describe("Variable name to store output data or extracted content in. Expected type: string. Example: 'extractedTitle'"),
@@ -111,9 +121,9 @@ const ActionSchema = z.object({
   conditionValue: z.string().optional().describe("Value to compare the condition variable against. Expected type: string. Example: 'true'"),
   typeMode: z.enum(['append', 'replace']).optional().default('replace').describe("Whether to append text or clear/replace existing text during 'type' actions. Expected type: string enum. Example: 'replace'"),
   method: z.string().optional().describe("HTTP method for 'http_request' actions. Expected type: string. Example: 'GET'"),
-  headers: z.string().optional().describe("JSON stringified headers for 'http_request'. Expected type: string. Example: '{\"Authorization\": \"Bearer x\"}'"),
-  body: z.string().optional().describe("Payload body for 'http_request' actions. Expected type: string. Example: '{\"query\": \"sales\"}'")
-}).describe("Represents a discrete automation step or flow-control operation executed in sequence.");
+  headers: z.string().optional().describe("JSON stringified headers for 'http_request'. Supports variable templating. MUST use '{$variable_name}' syntax for variable references. Expected type: string. Example: '{\"Authorization\": \"Bearer {$token}\"}'"),
+  body: z.string().optional().describe("Payload body for 'http_request' actions. Supports variable templating. MUST use '{$variable_name}' syntax for variable references. Expected type: string. Example: '{\"query\": \"{$value}\"}'")
+}).describe("Represents a discrete automation step or flow-control operation executed in sequence. Variable reference MUST use '{$variable_name}' syntax.");
 
 const VariableSchema = z.object({
   type: z.enum(['string', 'number', 'boolean']).describe("The data type of the stored variable. Expected type: string enum. Example: 'string'"),
@@ -275,10 +285,10 @@ const TASK_JSON_SCHEMA = {
     },
     actions: {
       type: "array",
-      description: "Sequential list of browser actions/control flow steps to execute.",
+      description: "Sequential list of browser actions/control flow steps to execute. Note: Variable reference MUST use '{$variable_name}' syntax.",
       items: {
         type: "object",
-        description: "Represents a discrete automation step or flow-control operation executed in sequence.",
+        description: "Represents a discrete automation step or flow-control operation executed in sequence. Variable reference MUST use '{$variable_name}' syntax.",
         properties: {
           id: {
             type: "string",
@@ -300,7 +310,7 @@ const TASK_JSON_SCHEMA = {
           },
           value: {
             type: "string",
-            description: "Input value or configuration value for this action. Used for typing text, script contents, or wait durations. Expected type: string. Example: 'hello@world.com'"
+            description: "Input value or configuration value for this action. Supports variable templating. MUST use '{$variable_name}' syntax for variable references (e.g., '{$myVar}'). NEVER use '{{variable_name}}' or '${variable_name}'. Expected type: string. Example: 'hello@world.com'"
           },
           key: {
             type: "string",
@@ -344,11 +354,11 @@ const TASK_JSON_SCHEMA = {
           },
           headers: {
             type: "string",
-            description: "JSON stringified headers for 'http_request'. Expected type: string. Example: '{\"Authorization\": \"Bearer x\"}'"
+            description: "JSON stringified headers for 'http_request'. Supports variable templating. MUST use '{$variable_name}' syntax for variable references (e.g., '{\"Authorization\": \"Bearer {$token}\"}'). NEVER use '{{variable_name}}' or '${variable_name}'. Expected type: string. Example: '{\"Authorization\": \"Bearer {$token}\"}'"
           },
           body: {
             type: "string",
-            description: "Payload body for 'http_request' actions. Expected type: string. Example: '{\"query\": \"sales\"}'"
+            description: "Payload body for 'http_request' actions. Supports variable templating. MUST use '{$variable_name}' syntax for variable references (e.g., '{\"query\": \"{$value}\"}'). NEVER use '{{variable_name}}' or '${variable_name}'. Expected type: string. Example: '{\"query\": \"{$value}\"}'"
           }
         },
         required: ["type"]
@@ -501,7 +511,7 @@ const TASK_DELETE_JSON_SCHEMA = {
 
 const TASK_UPDATE_JSON_SCHEMA = {
   type: "object",
-  description: "Exhaustive task update structure for Figranium automation tasks.",
+  description: "Exhaustive task update structure for Figranium automation tasks. NOTE: You MUST use '{$variable_name}' variable referencing syntax, and you MUST automatically test your changes using 'task_execute' right after task update unless prompted not to.",
   properties: {
     taskId: {
       type: "string",
@@ -515,11 +525,15 @@ const TASK_UPDATE_JSON_SCHEMA = {
 const CREATE_TASK_DESCRIPTION = `
 Create a complete, fully-configured Figranium automation task including sequential action steps, state variables, anti-bot stealth mechanisms, and optional scheduling.
 
+### !!! IMPORTANT GUIDELINES FOR LLM AGENTS !!!
+1. **VARIABLE TEMPLATING SYNTAX**: You MUST use \`{$variable_name}\` (with a single curly brace and dollar sign, e.g. \`{$myVar}\`) for variable references/templating inside action values, URLs, headers, or body fields. NEVER use double curly braces like \`{{variable_name}}\` or JavaScript-style templates like \`\${variable_name}\`, as these syntaxes are unsupported and will cause execution failures.
+2. **MANDATORY AUTOMATIC TESTING**: Unless the user explicitly prompts you NOT to test, you MUST immediately test and verify your newly created or updated tasks by calling the \`task_execute\` tool right after calling \`create_task\` or \`task_update\`. Automatic testing is mandatory to ensure correctness.
+
 ### 1. Purpose
 Use this tool when you need to automate any recurring or complex web-based workflows, including data extraction (scraping), automated form-filling, dashboard testing, or dynamic visual monitoring. Tasks are stored permanently in Figranium and can be executed ad-hoc, triggered via API, or scheduled.
 
 ### 2. Execution Model
-Figranium tasks run as a linear sequence of steps defined in the 'actions' array. Actions are processed in order from top to bottom. Control flow steps (such as 'if', 'while', 'repeat') allow loops and branching, while 'on_error' steps define fallback behaviors. Variables represent the state and can be updated dynamically during execution.
+Figranium tasks run as a linear sequence of steps defined in the 'actions' array. Actions are processed in order from top to bottom. Control flow steps (such as 'if', 'while', 'repeat') allow loops and branching, while 'on_error' steps define fallback behaviors. Variables represent the state and can be updated dynamically during execution. Ensure all opened block structures (such as 'if', 'while', 'repeat', 'foreach') are closed with an 'end' action step.
 
 ### 3. Comprehensive Step Types
 - 'navigate': Redirect browser to a new URL specified in the 'value' field.
