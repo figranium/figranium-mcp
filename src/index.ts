@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import process from "process";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -12,6 +15,9 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import axios, { AxiosInstance } from "axios";
 import { z } from "zod";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const BASE_URL = (process.env.FIGRANIUM_BASE_URL || "http://localhost:11345").replace(/\/+$/, "");
 const API_KEY = process.env.FIGRANIUM_API_KEY;
@@ -638,6 +644,23 @@ function formatZodError(error: z.ZodError): string {
 }
 
 /**
+ * Helper to safely read AGENT_SPEC.md from disk
+ */
+function readAgentSpec(): string {
+  const pathsToTry = [
+    path.join(__dirname, "..", "AGENT_SPEC.md"),
+    path.join(__dirname, "AGENT_SPEC.md"),
+    path.join(process.cwd(), "AGENT_SPEC.md")
+  ];
+  for (const p of pathsToTry) {
+    if (fs.existsSync(p)) {
+      return fs.readFileSync(p, "utf-8");
+    }
+  }
+  throw new Error("AGENT_SPEC.md not found");
+}
+
+/**
  * Register MCP Resources handler
  */
 server.setRequestHandler(ListResourcesRequestSchema, async () => {
@@ -648,6 +671,12 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
         name: "Figranium Task JSON Schema v1",
         mimeType: "application/json",
         description: "Exposes the full annotated JSON Schema of a Figranium task so agents can inspect the full specification directly."
+      },
+      {
+        uri: "figranium://docs/agent-spec.md",
+        name: "Figranium Agent Specification",
+        mimeType: "text/markdown",
+        description: "Exposes the complete Figranium Agent Specification (AGENT_SPEC.md) containing task schema, action types, variable templating, and control flow guides for AI agents."
       }
     ]
   };
@@ -665,6 +694,22 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         }
       ]
     };
+  }
+  if (uri === "figranium://docs/agent-spec.md") {
+    try {
+      const markdown = readAgentSpec();
+      return {
+        contents: [
+          {
+            uri: "figranium://docs/agent-spec.md",
+            mimeType: "text/markdown",
+            text: markdown
+          }
+        ]
+      };
+    } catch (err: any) {
+      throw new McpError(ErrorCode.InternalError, `Failed to read AGENT_SPEC.md: ${err.message}`);
+    }
   }
   throw new McpError(ErrorCode.InvalidParams, `Unknown resource URI: ${uri}`);
 });
