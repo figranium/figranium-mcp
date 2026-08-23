@@ -1,6 +1,6 @@
 {
   "name": "figranium-mcp",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "MCP server for Figranium, wrapping task execution, scheduling, and automation orchestration.",
   "repository": {
     "type": "git",
@@ -23,8 +23,8 @@
     "postbuild": "node -e \"require('fs').chmodSync('./dist/index.js', 0o755)\""
   },
   "dependencies": {
+    "@figranium/sdk": "^0.1.0",
     "@modelcontextprotocol/sdk": "^1.0.1",
-    "axios": "^1.6.8",
     "zod": "^3.22.4"
   },
   "devDependencies": {

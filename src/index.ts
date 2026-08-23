@@ -13,7 +13,12 @@ import {
   McpError,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import axios, { AxiosInstance } from "axios";
+import {
+  Figranium,
+  FigraniumError,
+  type Schedule,
+  type Task,
+} from "@figranium/sdk";
 import { z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,13 +34,11 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// Create pre-configured Axios instance
-const api: AxiosInstance = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    "x-api-key": API_KEY,
-    "Content-Type": "application/json",
-  },
+// Use the official SDK for all communication with the Figranium API.
+const figranium = new Figranium({
+  baseUrl: BASE_URL,
+  apiKey: API_KEY,
+  apiKeyHeader: "x-api-key",
 });
 
 const SYSTEM_INSTRUCTIONS = `
@@ -962,13 +965,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const taskPayload = parseResult.data;
 
-        // POST to Figranium's create task endpoint
-        const response = await api.post("/api/tasks", taskPayload);
+        const response = await figranium.tasks.save(taskPayload as Task);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -990,13 +992,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const { taskId, ...updates } = parseResult.data;
 
-        // PATCH to Figranium's update task endpoint
-        const response = await api.patch(`/api/tasks/${encodeURIComponent(taskId)}`, updates);
+        const response = await figranium.tasks.update(taskId, updates as Partial<Task>);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -1018,13 +1019,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const { taskId } = parseResult.data;
 
-        // DELETE to Figranium's delete task endpoint
-        const response = await api.delete(`/api/tasks/${encodeURIComponent(taskId)}`);
+        const response = await figranium.tasks.delete(taskId);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -1046,13 +1046,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const payload = parseResult.data;
 
-        // POST to Figranium's browser open endpoint
-        const response = await api.post("/api/browser/open", payload);
+        const response = await figranium.browser.open(payload);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -1074,25 +1073,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const payload = parseResult.data;
 
-        // POST to Figranium's inspector highlight endpoint
-        const response = await api.post("/api/inspector/highlight", payload);
+        const response = await figranium.browser.highlight(payload);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
       }
 
       case "task_list": {
-        const response = await api.get("/api/tasks/list");
+        const response = await figranium.tasks.listSummaries();
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -1108,7 +1106,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new McpError(ErrorCode.InvalidParams, "taskId is required");
         }
 
-        const response = await api.post(`/api/tasks/${encodeURIComponent(taskId)}/api`, {
+        const response = await figranium.runTask(taskId, {
           variables: variables || {},
         });
 
@@ -1116,43 +1114,43 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
       }
 
       case "execution_list": {
-        const response = await api.get("/api/executions/list");
+        const response = await figranium.executions.list();
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
       }
 
       case "schedule_list": {
-        const response = await api.get("/api/schedules");
+        const response = await figranium.schedules.list();
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
       }
 
       case "schedule_get_all_status": {
-        const response = await api.get("/api/schedules/status/all");
+        const response = await figranium.schedules.overallStatus();
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -1164,12 +1162,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new McpError(ErrorCode.InvalidParams, "taskId is required");
         }
 
-        const response = await api.get(`/api/schedules/${encodeURIComponent(taskId)}/status`);
+        const response = await figranium.schedules.status(taskId);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -1181,12 +1179,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new McpError(ErrorCode.InvalidParams, "taskId is required");
         }
 
-        const response = await api.delete(`/api/schedules/${encodeURIComponent(taskId)}`);
+        const response = await figranium.schedules.delete(taskId);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -1244,12 +1242,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        const response = await api.post(`/api/schedules/${encodeURIComponent(taskId)}`, body);
+        const response = await figranium.schedules.set(taskId, body as unknown as Schedule);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -1305,12 +1303,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        const response = await api.post(`/api/schedules/${encodeURIComponent(taskId)}/describe`, body);
+        const response = await figranium.schedules.describe(taskId, body as unknown as Schedule);
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -1321,8 +1319,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   } catch (error: any) {
     let errorMessage = error.message || "An unknown error occurred";
-    if (axios.isAxiosError(error) && error.response) {
-      errorMessage = `API Error [${error.response.status}]: ${JSON.stringify(error.response.data)}`;
+    if (error instanceof FigraniumError) {
+      const details = error.details === undefined ? "" : `: ${JSON.stringify(error.details)}`;
+      errorMessage = `API Error [${error.status}]: ${error.message}${details}`;
     }
     return {
       content: [

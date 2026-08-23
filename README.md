@@ -3,7 +3,7 @@
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.figranium%2Ffigranium--mcp-blue)](https://registry.modelcontextprotocol.io)
 [![GHCR Container](https://img.shields.io/badge/GHCR-ghcr.io%2Ffigranium%2Ffigranium--mcp-green)](https://github.com/figranium/figranium-mcp/pkgs/container/figranium-mcp)
 
-A Model Context Protocol (MCP) server for [Figranium](https://github.com/figranium/figranium) built using `@modelcontextprotocol/sdk`. This server allows LLM clients (like Claude Desktop, Cursor, and Manus AI) to discover, execute, inspect, schedule, and programmatically create Figranium automation tasks via standard STDIO transport.
+A Model Context Protocol (MCP) server for [Figranium](https://github.com/figranium/figranium), built with `@modelcontextprotocol/sdk` and the official `@figranium/sdk` API client. This server allows LLM clients (like Claude Desktop, Cursor, and Manus AI) to discover, execute, inspect, schedule, and programmatically create Figranium automation tasks via standard STDIO transport.
 
 ## Table of Contents
 - [Quick Start (Docker / OCI)](#quick-start-docker--oci)
