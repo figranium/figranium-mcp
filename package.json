@@ -2,6 +2,10 @@
   "name": "figranium-mcp",
   "version": "1.0.3",
   "description": "MCP server for Figranium, wrapping task execution, scheduling, and automation orchestration.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/figranium/figranium-mcp.git"
+  },
   "main": "dist/index.js",
   "bin": {
     "figranium-mcp": "dist/index.js"
