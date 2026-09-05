@@ -3,14 +3,16 @@
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.figranium%2Ffigranium--mcp-blue)](https://registry.modelcontextprotocol.io)
 [![GHCR Container](https://img.shields.io/badge/GHCR-ghcr.io%2Ffigranium%2Ffigranium--mcp-green)](https://github.com/figranium/figranium-mcp/pkgs/container/figranium-mcp)
 
-A Model Context Protocol (MCP) server for [Figranium](https://github.com/figranium/figranium), built with `@modelcontextprotocol/sdk` and the official `@figranium/sdk` API client. This server allows LLM clients (like Claude Desktop, Cursor, and Manus AI) to discover, execute, inspect, schedule, and programmatically create Figranium automation tasks via standard STDIO transport.
+A Model Context Protocol (MCP) server for [Figranium](https://github.com/figranium/figranium), built with `@modelcontextprotocol/sdk` and the official `@figranium/sdk` API client. This server allows LLM clients (like Cline, Claude Desktop, Cursor, and Manus AI) to discover, execute, inspect, schedule, and programmatically create Figranium automation tasks via standard STDIO transport.
 
 ## Table of Contents
 - [Quick Start (Docker / OCI)](#quick-start-docker--oci)
 - [Client Integration](#client-integration)
+  - [Cline](#cline)
   - [Claude Desktop](#claude-desktop)
   - [Cursor IDE](#cursor-ide)
   - [Manus AI / Registry Clients](#manus-ai--registry-clients)
+- [Automated AI Setup (`llms-install.md`)](#automated-ai-setup-llms-installmd)
 - [Environment Variables](#environment-variables)
 - [Server-Wide System Instructions](#server-wide-system-instructions)
 - [Available Resources](#available-resources)
@@ -59,6 +61,50 @@ If `FIGRANIUM_API_KEY` is missing, the server prints a clear setup message and e
 
 ## Client Integration
 
+### Cline
+
+Add the following to your `cline_mcp_settings.json`:
+
+* **macOS**: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+* **Windows**: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+* **Linux**: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+
+```json
+{
+  "mcpServers": {
+    "figranium": {
+      "command": "npx",
+      "args": ["-y", "figranium-mcp"],
+      "env": {
+        "FIGRANIUM_BASE_URL": "http://localhost:11345",
+        "FIGRANIUM_API_KEY": "your_figranium_api_key_here"
+      }
+    }
+  }
+}
+```
+
+Alternatively, if running directly from a cloned source repository:
+
+```json
+{
+  "mcpServers": {
+    "figranium": {
+      "command": "node",
+      "args": ["/path/to/figranium-mcp/dist/index.js"],
+      "env": {
+        "FIGRANIUM_BASE_URL": "http://localhost:11345",
+        "FIGRANIUM_API_KEY": "your_figranium_api_key_here"
+      }
+    }
+  }
+}
+```
+
+> **Automated Setup for Cline**: Give Cline a link or reference to [`llms-install.md`](./llms-install.md) and Cline will perform the setup and configuration automatically.
+
+---
+
 ### Claude Desktop
 
 Add the container configuration to your `claude_desktop_config.json`:
@@ -106,6 +152,12 @@ Add the following to `~/.cursor/mcp.json`:
 ```
 
 This lets Claude Desktop and Cursor launch the package directly without requiring a local build or a Docker bridge.
+
+---
+
+## Automated AI Setup (`llms-install.md`)
+
+AI assistants (including Cline, Cursor, Claude Desktop, and Roo Code) can automatically read [`llms-install.md`](./llms-install.md) to set up and configure the Figranium MCP server without manual intervention.
 
 ---
 
