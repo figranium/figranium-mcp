@@ -1,7 +1,8 @@
 {
   "name": "figranium-mcp",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "MCP server for Figranium, wrapping task execution, scheduling, and automation orchestration.",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/figranium/figranium-mcp.git"
