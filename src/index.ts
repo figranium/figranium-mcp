@@ -59,7 +59,9 @@ Every task follows a strict execution pipeline that you must carefully construct
 
 3. TASK CREATION:
    - A task must have a 'name', an initial starting 'url', and an execution 'mode' ('scrape', 'agent', or 'headful').
-   - Fast, non-interactive tasks should use 'scrape' mode. Detailed, multi-step scenarios requiring mouse/keyboard simulation should use 'agent' mode. Visible, interactive debug sessions should use 'headful' mode.
+   - Use 'agent' mode by default, including for scraping tasks. Agent mode supports the 'actions' array and should be chosen for nearly all browser automation and extraction workflows.
+   - 'scrape' mode does NOT support action blocks. Use it only for exceptional cases that require extremely fast, action-free scraping.
+   - Use 'headful' mode for visible, interactive debug sessions.
    - Configure anti-bot stealth parameters under the 'stealth' object to simulate organic human browsing patterns (typos, curved mouse glides, randomize clicks).
 
 4. STEP SEQUENCE CONSTRUCTION (ACTIONS):
@@ -117,7 +119,8 @@ const ActionSchema = z.object({
     'click', 'type', 'wait', 'wait_selector', 'press', 'scroll', 'javascript',
     'csv', 'hover', 'merge', 'screenshot', 'if', 'else', 'end', 'while',
     'repeat', 'foreach', 'stop', 'set', 'on_error', 'navigate', 'wait_downloads',
-    'start', 'http_request', 'get_content'
+    'start', 'http_request', 'get_content', 'solve_captcha', 'wait_captcha',
+    'upload', 'finalize_uploads'
   ]).describe("The action type to perform. Expected type: string enum. Example: 'click'"),
   selector: z.string().optional().describe("CSS selector, XPath, or ARIA locator for the target element. Required for click, type, hover, wait_selector. Expected type: string. Example: '#username'"),
   value: z.string().optional().describe("Input value or configuration value for this action. Supports variable templating. MUST use '{$variable_name}' syntax for variable references (e.g., '{$myVar}'). NEVER use '{{variable_name}}' or '${variable_name}'. Expected type: string. Example: 'hello@world.com'"),
@@ -131,7 +134,11 @@ const ActionSchema = z.object({
   typeMode: z.enum(['append', 'replace']).optional().default('replace').describe("Whether to append text or clear/replace existing text during 'type' actions. Expected type: string enum. Example: 'replace'"),
   method: z.string().optional().describe("HTTP method for 'http_request' actions. Expected type: string. Example: 'GET'"),
   headers: z.string().optional().describe("JSON stringified headers for 'http_request'. Supports variable templating. MUST use '{$variable_name}' syntax for variable references. Expected type: string. Example: '{\"Authorization\": \"Bearer {$token}\"}'"),
-  body: z.string().optional().describe("Payload body for 'http_request' actions. Supports variable templating. MUST use '{$variable_name}' syntax for variable references. Expected type: string. Example: '{\"query\": \"{$value}\"}'")
+  body: z.string().optional().describe("Payload body for 'http_request' actions. Supports variable templating. MUST use '{$variable_name}' syntax for variable references. Expected type: string. Example: '{\"query\": \"{$value}\"}'"),
+  captchaType: z.enum(['recaptcha_v2', 'recaptcha_v3', 'hcaptcha', 'turnstile']).optional().describe("The CAPTCHA provider to target for 'solve_captcha'/'wait_captcha' actions. Expected type: string enum. Example: 'recaptcha_v2'"),
+  timeout: z.number().optional().describe("Maximum time in seconds to wait for a CAPTCHA to become ready or solved, for 'solve_captcha'/'wait_captcha' actions. Expected type: number. Example: 30"),
+  cabinetId: z.string().optional().describe("Source Cabinet ID for an 'upload' action; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"),
+  markAsUploaded: z.boolean().optional().describe("When true, an 'upload' action marks its Cabinet item uploaded immediately after attaching it. Expected type: boolean. Example: false")
 }).describe("Represents a discrete automation step or flow-control operation executed in sequence. Variable reference MUST use '{$variable_name}' syntax.");
 
 const VariableSchema = z.object({
@@ -154,7 +161,7 @@ const CreateTaskSchema = z.object({
   name: z.string().describe("Descriptive name of the automation task. Expected type: string. Example: 'Lead Extractor'"),
   description: z.string().optional().describe("Detailed description of what the task automates. Expected type: string. Example: 'Logs in and extracts weekly leads'"),
   url: z.string().describe("Initial URL to navigate to when the task starts. Expected type: string. Example: 'https://news.ycombinator.com'"),
-  mode: z.enum(['scrape', 'agent', 'headful']).describe("Execution mode. 'scrape' is fast and headless; 'agent' uses automated browser interaction; 'headful' runs in a visible browser window. Expected type: string enum. Example: 'agent'"),
+  mode: z.enum(['scrape', 'agent', 'headful']).describe("Execution mode. Use 'agent' by default, including for scraping, because it supports action blocks. 'scrape' does not support action blocks and is only for exceptional, extremely fast action-free scraping. 'headful' runs in a visible browser window. Expected type: string enum. Example: 'agent'"),
   wait: z.number().default(3).describe("Standard delay in seconds to wait after navigation and page loads. Expected type: number. Example: 5"),
   selector: z.string().optional().describe("Default CSS selector to wait for on the page load before starting actions. Expected type: string. Example: '.main-content'"),
   rotateUserAgents: z.boolean().default(false).describe("Rotate user agents across requests to avoid pattern blocking. Expected type: boolean. Example: true"),
@@ -162,7 +169,7 @@ const CreateTaskSchema = z.object({
   rotateViewport: z.boolean().default(false).describe("Vary viewport resolutions randomly to simulate multiple devices. Expected type: boolean. Example: true"),
   humanTyping: z.boolean().default(false).describe("Vary typing speeds to simulate organic human typing. Expected type: boolean. Example: true"),
   stealth: StealthConfigSchema.optional().describe("Realistic human behavior configurations. Expected type: object."),
-  actions: z.array(ActionSchema).default([]).describe("Sequential list of browser actions/control flow steps to execute. Expected type: array of action objects."),
+  actions: z.array(ActionSchema).default([]).describe("Sequential list of browser actions/control flow steps to execute. Action blocks require 'agent' or 'headful' mode and are not supported in 'scrape' mode. Expected type: array of action objects."),
   variables: z.record(VariableSchema).default({}).describe("Task variables to store state and dynamic values. Expected type: record object of variable configurations."),
   extractionScript: z.string().optional().describe("Optional post-execution script to extract data. Expected type: string. Example: 'return Array.from(document.querySelectorAll(\"a\")).map(el => el.href)'"),
   extractionFormat: z.enum(['json', 'csv']).optional().default('json').describe("Target export format of any extracted data. Expected type: string enum. Example: 'json'"),
@@ -170,6 +177,7 @@ const CreateTaskSchema = z.object({
   includeShadowDom: z.boolean().optional().default(true).describe("Whether to parse and resolve target elements residing in Shadow DOMs. Expected type: boolean. Example: true"),
   disableRecording: z.boolean().optional().default(false).describe("Disable video/VNC recording of this task to save storage. Expected type: boolean. Example: true"),
   statelessExecution: z.boolean().optional().default(false).describe("If set to true, clear browser cookies and session states between runs. Expected type: boolean. Example: false"),
+  cabinetId: z.string().optional().describe("Cabinet used for intercepted downloads and 'upload' actions that omit their own cabinetId; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"),
   schedule: TaskScheduleSchema.optional().describe("Task automatic execution schedule. Expected type: object.")
 }).describe("Reflects the full schema of a Figranium task creation payload.");
 
@@ -215,7 +223,7 @@ const TASK_JSON_SCHEMA = {
     mode: {
       type: "string",
       enum: ["scrape", "agent", "headful"],
-      description: "Execution mode. 'scrape' is fast and headless; 'agent' uses automated browser interaction; 'headful' runs in a visible browser window with human oversight. Expected type: string enum. Example: 'agent'"
+      description: "Execution mode. Use 'agent' by default, including for scraping, because it supports action blocks. 'scrape' does not support action blocks and is only for exceptional, extremely fast action-free scraping. 'headful' runs in a visible browser window with human oversight. Expected type: string enum. Example: 'agent'"
     },
     wait: {
       type: "number",
@@ -294,7 +302,7 @@ const TASK_JSON_SCHEMA = {
     },
     actions: {
       type: "array",
-      description: "Sequential list of browser actions/control flow steps to execute. Note: Variable reference MUST use '{$variable_name}' syntax.",
+      description: "Sequential list of browser actions/control flow steps to execute. Action blocks require 'agent' or 'headful' mode and are not supported in 'scrape' mode. Note: Variable references MUST use '{$variable_name}' syntax.",
       items: {
         type: "object",
         description: "Represents a discrete automation step or flow-control operation executed in sequence. Variable reference MUST use '{$variable_name}' syntax.",
@@ -309,7 +317,8 @@ const TASK_JSON_SCHEMA = {
               "click", "type", "wait", "wait_selector", "press", "scroll", "javascript",
               "csv", "hover", "merge", "screenshot", "if", "else", "end", "while",
               "repeat", "foreach", "stop", "set", "on_error", "navigate", "wait_downloads",
-              "start", "http_request", "get_content"
+              "start", "http_request", "get_content", "solve_captcha", "wait_captcha",
+              "upload", "finalize_uploads"
             ],
             description: "The action type to perform. Expected type: string enum. Example: 'click'"
           },
@@ -368,6 +377,24 @@ const TASK_JSON_SCHEMA = {
           body: {
             type: "string",
             description: "Payload body for 'http_request' actions. Supports variable templating. MUST use '{$variable_name}' syntax for variable references (e.g., '{\"query\": \"{$value}\"}'). NEVER use '{{variable_name}}' or '${variable_name}'. Expected type: string. Example: '{\"query\": \"{$value}\"}'"
+          },
+          captchaType: {
+            type: "string",
+            enum: ["recaptcha_v2", "recaptcha_v3", "hcaptcha", "turnstile"],
+            description: "The CAPTCHA provider to target for 'solve_captcha'/'wait_captcha' actions. Expected type: string enum. Example: 'recaptcha_v2'"
+          },
+          timeout: {
+            type: "number",
+            description: "Maximum time in seconds to wait for a CAPTCHA to become ready or solved, for 'solve_captcha'/'wait_captcha' actions. Expected type: number. Example: 30"
+          },
+          cabinetId: {
+            type: "string",
+            description: "Source Cabinet ID for an 'upload' action; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"
+          },
+          markAsUploaded: {
+            type: "boolean",
+            default: false,
+            description: "When true, an 'upload' action marks its Cabinet item uploaded immediately after attaching it. Expected type: boolean. Example: false"
           }
         },
         required: ["type"]
@@ -426,6 +453,10 @@ const TASK_JSON_SCHEMA = {
       type: "boolean",
       default: false,
       description: "If set to true, clear browser cookies and session states between runs. Expected type: boolean. Example: false"
+    },
+    cabinetId: {
+      type: "string",
+      description: "Cabinet used for intercepted downloads and 'upload' actions that omit their own cabinetId; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"
     },
     schedule: {
       type: "object",
@@ -537,6 +568,7 @@ Create a complete, fully-configured Figranium automation task including sequenti
 ### !!! IMPORTANT GUIDELINES FOR LLM AGENTS !!!
 1. **VARIABLE TEMPLATING SYNTAX**: You MUST use \`{$variable_name}\` (with a single curly brace and dollar sign, e.g. \`{$myVar}\`) for variable references/templating inside action values, URLs, headers, or body fields. NEVER use double curly braces like \`{{variable_name}}\` or JavaScript-style templates like \`\${variable_name}\`, as these syntaxes are unsupported and will cause execution failures.
 2. **MANDATORY AUTOMATIC TESTING**: Unless the user explicitly prompts you NOT to test, you MUST immediately test and verify your newly created or updated tasks by calling the \`task_execute\` tool right after calling \`create_task\` or \`task_update\`. Automatic testing is mandatory to ensure correctness.
+3. **MODE SELECTION**: Use \`agent\` mode by default, including for scraping tasks. \`scrape\` mode does not support action blocks and should be used only when extremely fast, action-free scraping is required. Use \`headful\` for visible interactive debugging.
 
 ### 1. Purpose
 Use this tool when you need to automate any recurring or complex web-based workflows, including data extraction (scraping), automated form-filling, dashboard testing, or dynamic visual monitoring. Tasks are stored permanently in Figranium and can be executed ad-hoc, triggered via API, or scheduled.
@@ -560,6 +592,10 @@ Figranium tasks run as a linear sequence of steps defined in the 'actions' array
 - 'while', 'repeat', 'foreach': Looping blocks.
 - 'stop': Halt task execution.
 - 'set': Set or update a task variable.
+- 'solve_captcha': Attempt to automatically solve a detected CAPTCHA challenge.
+- 'wait_captcha': Pause until a CAPTCHA challenge is initialized/ready without solving it.
+- 'upload': Attach the newest unuploaded file, ZIP, or folder from a Cabinet (see 'cabinetId') to a file input, chooser, or drop target matching 'selector'.
+- 'finalize_uploads': Mark all Cabinet items attached during the execution as uploaded.
 
 ### 4. Selector Strategy & Fallbacks
 When targeting elements, follow this hierarchy of selectors:
@@ -936,6 +972,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["taskId", "scheduleMode"],
         },
       },
+      {
+        name: "list_cabinets",
+        description: "List all Cabinets (durable download queues) configured on the Figranium server, including their IDs, names, and item counts. Use this to find a cabinetId to reference in a task's 'cabinetId' field or an 'upload' action.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "create_cabinet",
+        description: "Create a new Cabinet (durable download queue) on the Figranium server.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description: "Descriptive name for the new Cabinet. Expected type: string. Example: 'Invoices'",
+            },
+          },
+          required: ["name"],
+        },
+      },
     ],
   };
 });
@@ -1304,6 +1362,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const response = await figranium.schedules.describe(taskId, body as unknown as Schedule);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "list_cabinets": {
+        const response = await figranium.cabinets.list();
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "create_cabinet": {
+        const { name: cabinetName } = (args || {}) as { name: string };
+        if (!cabinetName) {
+          throw new McpError(ErrorCode.InvalidParams, "name is required");
+        }
+        const response = await figranium.cabinets.create(cabinetName);
         return {
           content: [
             {

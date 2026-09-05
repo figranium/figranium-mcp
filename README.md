@@ -164,7 +164,7 @@ AI assistants (including Cline, Cursor, Claude Desktop, and Roo Code) can automa
 ## Server-Wide System Instructions
 
 The server initializes with embedded guidelines for LLM agents detailing the task lifecycle:
-1. **Task Creation**: Structuring name, starting URL, execution mode (`scrape`, `agent`, or `headful`), and stealth mechanisms.
+1. **Task Creation**: Structuring name, starting URL, execution mode, and stealth mechanisms. Agents should default to `agent` mode, including for scraping tasks. `scrape` mode does not support action blocks and is reserved for exceptional cases requiring extremely fast, action-free scraping; `headful` is intended for visible interactive debugging.
 2. **Step Sequence Construction**: Ordering action steps (`navigate`, `wait_selector`, `click`, `type`, `javascript`) and execution flow.
 3. **Selector Strategy**: Preferring robust ARIA, ID, and semantic class selectors with fallback strategies.
 4. **Execution & Variables**: Injecting and overriding runtime context variables.
