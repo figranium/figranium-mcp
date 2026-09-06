@@ -3,7 +3,7 @@
   "name": "io.github.figranium/figranium-mcp",
   "title": "Figranium MCP",
   "description": "MCP server for creating, running, inspecting, and scheduling Figranium browser automations.",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "repository": {
     "source": "github",
     "url": "https://github.com/figranium/figranium-mcp.git"
@@ -13,7 +13,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "figranium-mcp",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
