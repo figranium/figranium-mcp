@@ -1,7 +1,7 @@
 # Figranium MCP Server
 
-[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.figranium%2Ffigranium--mcp-blue)](https://registry.modelcontextprotocol.io)
-[![GHCR Container](https://img.shields.io/badge/GHCR-ghcr.io%2Ffigranium%2Ffigranium--mcp-green)](https://github.com/figranium/figranium-mcp/pkgs/container/figranium-mcp)
+[![NPM](https://img.shields.io/npm/v/figranium-mcp?label=NPM)](https://www.npmjs.com/package/figranium-mcp)
+[![Figranium MCP Server MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/figranium/figranium-mcp/badges/score.svg)](https://glama.ai/mcp/servers/figranium/figranium-mcp)
 
 A Model Context Protocol (MCP) server for [Figranium](https://github.com/figranium/figranium), built with `@modelcontextprotocol/sdk` and the official `@figranium/sdk` API client. This server allows LLM clients (like Cline, Claude Desktop, Cursor, and Manus AI) to discover, execute, inspect, schedule, and programmatically create Figranium automation tasks via standard STDIO transport.
 
