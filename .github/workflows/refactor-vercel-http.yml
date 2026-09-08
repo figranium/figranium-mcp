@@ -1,0 +1,45 @@
+name: Refactor Vercel MCP transport
+
+on:
+  push:
+    branches:
+      - vercel-http-mcp
+    paths:
+      - .github/workflows/refactor-vercel-http.yml
+      - scripts/refactor-vercel-http.mjs
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: vercel-http-mcp
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Refactor source
+        run: node scripts/refactor-vercel-http.mjs
+
+      - name: Refresh lockfile and install
+        run: npm install
+
+      - name: Build package
+        run: npm run build
+
+      - name: Type-check Vercel function
+        run: npx tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --types node --strict --esModuleInterop --skipLibCheck api/mcp.ts
+
+      - name: Commit generated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/index.ts src/mcp-server.ts src/http.ts api/mcp.ts vercel.json package.json package-lock.json
+          git commit -m "feat: add Vercel Streamable HTTP MCP transport"
+          git push origin HEAD:vercel-http-mcp
