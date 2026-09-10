@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "figranium",
+  "version": "1.2.2",
+  "description": "Use Figranium from GitHub Copilot for deterministic browser automation, task execution, scraping, scheduling, and execution inspection through MCP.",
+  "author": {
+    "name": "Figranium",
+    "url": "https://figranium.dev"
+  },
+  "homepage": "https://figranium.dev",
+  "repository": "https://github.com/figranium/figranium-mcp",
+  "license": "Apache-2.0",
+  "keywords": [
+    "browser-automation",
+    "mcp",
+    "web-scraping",
+    "automation",
+    "copilot"
+  ]
+}
