@@ -61,18 +61,31 @@ jobs:
             "- 'set': Set or update a task variable.",
             "- 'set': Create or update a runtime variable for intermediate state. It can create variables that are not predeclared in task.variables."
           )
-          marker = "3. **MODE SELECTION**: Use `agent` mode by default, including for scraping tasks. `scrape` mode does not support action blocks and should be used only when extremely fast, action-free scraping is required. Use `headful` for visible interactive debugging."
-          addition = marker + "\n4. **INPUTS VS RUNTIME STATE VS OUTPUTS**: `variables` is only for caller-provided inputs/defaults. Use `set` to create/update runtime-only state. Put final extracted outputs in `extractionScript`; do not mirror output fields into `variables` unless they are genuinely inputs.\n5. **PREFER NATIVE ACTIONS**: Prefer normal Figranium actions over `javascript`. Use JavaScript only when the task requires scripting or native actions are not sufficiently reliable."
-          if marker not in s:
-              raise SystemExit('create-task guideline marker not found')
-          s = s.replace(marker, addition)
 
-          # Replace the old example, which incorrectly modeled scraped output as a variable,
-          # with an extractionScript-based result and no output variable.
-          old_example = '''    {\n      \"type\": \"javascript\",\n      \"value\": \"return Array.from(document.querySelectorAll('.athing')).map(tr => ({ id: tr.id, title: tr.querySelector('.titleline > a')?.innerText, href: tr.querySelector('.titleline > a')?.href }));\",\n      \"varName\": \"hn_stories\"\n    },'''
+          heading = '### !!! IMPORTANT GUIDELINES FOR LLM AGENTS !!!'
+          extra = '''### !!! IMPORTANT GUIDELINES FOR LLM AGENTS !!!
+0. **INPUTS VS RUNTIME STATE VS OUTPUTS**: `variables` is only for caller-provided inputs/defaults. Use `set` to create/update runtime-only state; it can create variables without predeclaring them. Put final extracted outputs in `extractionScript`; do not mirror output fields into `variables` unless they are genuinely inputs.
+0. **PREFER NATIVE ACTIONS**: Prefer normal Figranium actions over `javascript`. Use JavaScript only when the task genuinely requires scripting or native actions are not sufficiently reliable.'''
+          if heading not in s:
+              raise SystemExit('create-task guideline heading not found')
+          s = s.replace(heading, extra, 1)
+
+          old_example = '''    {
+      \"type\": \"javascript\",
+      \"value\": \"return Array.from(document.querySelectorAll('.athing')).map(tr => ({ id: tr.id, title: tr.querySelector('.titleline > a')?.innerText, href: tr.querySelector('.titleline > a')?.href }));\",
+      \"varName\": \"hn_stories\"
+    },'''
           s = s.replace(old_example, '')
-          old_vars = '''  \"variables\": {\n    \"hn_stories\": {\n      \"type\": \"string\",\n      \"value\": \"[]\"\n    }\n  },\n  \"extractionFormat\": \"json\"'''
-          new_vars = '''  \"variables\": {},\n  \"extractionScript\": \"return Array.from(document.querySelectorAll('.athing')).map(tr => ({ id: tr.id, title: tr.querySelector('.titleline > a')?.innerText, href: tr.querySelector('.titleline > a')?.href }));\",\n  \"extractionFormat\": \"json\"'''
+          old_vars = '''  \"variables\": {
+    \"hn_stories\": {
+      \"type\": \"string\",
+      \"value\": \"[]\"
+    }
+  },
+  \"extractionFormat\": \"json\"'''
+          new_vars = '''  \"variables\": {},
+  \"extractionScript\": \"return Array.from(document.querySelectorAll('.athing')).map(tr => ({ id: tr.id, title: tr.querySelector('.titleline > a')?.innerText, href: tr.querySelector('.titleline > a')?.href }));\",
+  \"extractionFormat\": \"json\"'''
           if old_vars not in s:
               raise SystemExit('example variables target not found')
           s = s.replace(old_vars, new_vars)
@@ -80,7 +93,15 @@ jobs:
 
           spec = Path('AGENT_SPEC.md')
           t = spec.read_text()
-          section = '''\n\n## Variable and extraction authoring rules\n\n- Treat task-level `variables` as caller-provided inputs/configuration only. Declare a variable there only when a user or API caller should be able to supply or override it before execution. Do not create variables merely because a task returns fields with those names.\n- Use **Set Variable** (`set`) for runtime-only/intermediate state. It can create a new runtime variable or update an existing one; runtime-only variables do not need to be predeclared in `task.variables`.\n- Put actual final extraction logic and structured output in `extractionScript`. Output fields such as `price`, `title`, `email`, or table rows should come from the extraction script unless they are independently meaningful inputs.\n- Prefer native Figranium actions over `javascript` blocks. Use JavaScript only when the task genuinely requires scripting or the normal action is not sufficiently reliable.\n'''
+          section = '''
+
+## Variable and extraction authoring rules
+
+- Treat task-level `variables` as caller-provided inputs/configuration only. Declare a variable there only when a user or API caller should be able to supply or override it before execution. Do not create variables merely because a task returns fields with those names.
+- Use **Set Variable** (`set`) for runtime-only/intermediate state. It can create a new runtime variable or update an existing one; runtime-only variables do not need to be predeclared in `task.variables`.
+- Put actual final extraction logic and structured output in `extractionScript`. Output fields such as `price`, `title`, `email`, or table rows should come from the extraction script unless they are independently meaningful inputs.
+- Prefer native Figranium actions over `javascript` blocks. Use JavaScript only when the task genuinely requires scripting or the normal action is not sufficiently reliable.
+'''
           if '## Variable and extraction authoring rules' not in t:
               spec.write_text(t.rstrip() + section + '\n')
           PY
