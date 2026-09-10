@@ -47,35 +47,58 @@ Every task follows a strict execution pipeline that you must carefully construct
 
 1. VARIABLE TEMPLATING SYNTAX (HIGH PRIORITY):
    - You MUST use '{$variable_name}' (with a single curly brace and dollar sign, e.g. {$myVar}) for variable references/templating inside action values, URLs, headers, or body fields.
-   - NEVER use double curly braces like '{{variable_name}}' or JavaScript-style templates like '\${variable_name}', as these syntaxes are unsupported and will cause execution failures.
-   - Always ensure any template tokens resolve to valid declared variables.
+   - NEVER use double curly braces like '{{variable_name}}' or JavaScript-style templates, as these syntaxes are unsupported and will cause execution failures.
+   - Task-level variables are INPUTS or caller-overridable configuration only. Do not declare variables merely because the task returns fields with those names.
+   - Example: if a task accepts a starting price and returns a final price, the starting price may be a task variable; an output-only price field must not be declared as a task variable.
+   - Use the 'set' (Set Variable) action for values created or updated during execution and needed by later steps. Set Variable can both create a new runtime variable and update an existing one.
 
 2. MANDATORY AUTOMATIC TESTING:
-   - UNLESS EXPLICITLY PROMPTED BY THE USER NOT TO TEST, you MUST immediately test and verify your newly created or updated tasks by calling the 'task_execute' tool right after calling 'create_task' or 'task_update'.
-   - Do not wait for additional user instructions to run/test the task; automatic testing is mandatory to ensure correctness.
+   - UNLESS EXPLICITLY PROMPTED BY THE USER NOT TO TEST, you MUST immediately test and verify newly created or updated tasks by calling the 'task_execute' tool right after calling 'create_task' or 'task_update'.
+   - AFTER TESTING A TASK, do not consider an execution successful merely because its execution status is 'success'.
+   - Inspect the actual returned result and verify that it meaningfully satisfies the user's request.
+   - If the output is empty, malformed, irrelevant, duplicated, unexpectedly null, or otherwise incorrect, fix the task and execute it again.
 
-3. TASK CREATION:
+3. TASK CREATION AND DESIGN:
    - A task must have a 'name', an initial starting 'url', and an execution 'mode' ('scrape', 'agent', or 'headful').
    - Use 'agent' mode by default, including for scraping tasks. Agent mode supports the 'actions' array and should be chosen for nearly all browser automation and extraction workflows.
    - 'scrape' mode does NOT support action blocks. Use it only for exceptional cases that require extremely fast, action-free scraping.
    - Use 'headful' mode for visible, interactive debug sessions.
-   - Configure anti-bot stealth parameters under the 'stealth' object to simulate organic human browsing patterns (typos, curved mouse glides, randomize clicks).
+   - Prefer the simplest native Figranium workflow that reliably satisfies the request.
+   - Do not add actions that duplicate task-level behavior. In particular, do not add duplicate On Execution/start, wait, or navigate actions when the task-level start/navigation/wait behavior already performs that job.
+   - Do not add variables, waits, navigation, JavaScript, loops, or other blocks unless they serve a concrete purpose.
+   - Do not create configuration options the task does not actually use.
+   - Prefer native Figranium actions over JavaScript. Use JavaScript blocks only when the task genuinely requires scripting or when normal actions are not sufficiently reliable.
 
 4. STEP SEQUENCE CONSTRUCTION (ACTIONS):
-   - You must organize automation steps sequentially in the 'actions' array.
-   - Supported actions include page navigation ('navigate'), waiting ('wait', 'wait_selector'), element interaction ('click', 'type', 'hover', 'press'), script execution ('javascript'), control flow ('if', 'else', 'end', 'while', 'repeat', 'foreach'), and extraction ('csv', 'get_content').
-   - For interactive elements, ensure a 'wait_selector' is performed BEFORE click/type actions to guarantee the DOM is ready.
-   - Always remember to close all opened block structures (e.g., 'if', 'while', 'repeat', 'foreach') with a corresponding 'end' action step.
+   - Organize automation steps sequentially in the 'actions' array.
+   - Supported actions include page navigation ('navigate'), waiting ('wait', 'wait_selector'), element interaction ('click', 'type', 'hover', 'press'), script execution ('javascript'), control flow ('if', 'else', 'end', 'while', 'repeat', 'foreach'), and extraction helpers ('csv', 'get_content').
+   - Add a 'wait_selector' before click/type only when readiness is not already guaranteed and the wait serves a concrete reliability purpose.
+   - Always close opened block structures (e.g. 'if', 'while', 'repeat', 'foreach') with a corresponding 'end' action step.
 
-5. TARGET SELECTOR RESOLUTION:
-   - Prefer highly resilient selector strategies: ID-based selectors (e.g. '#login-btn'), robust CSS classes, XPath, ARIA roles, or reliable text matchers.
-   - Avoid brittle, highly nested selectors (like 'div > div > span > button') which break easily.
-   - For nested elements, check if they reside inside Shadow DOMs, and ensure 'includeShadowDom' is set to true.
+5. SOURCE AND EXTRACTION:
+   - When the user does not specify a source, choose one that directly represents the requested data rather than fetching a broad unrelated dataset and filtering it afterward.
+   - Prefer structured first-party/public APIs when they provide the required information reliably.
+   - Final task outputs belong in the task's 'extractionScript' field. Do not model final output fields as task variables.
+   - Final result table parsing and final structured extraction must be implemented in 'extractionScript'; JavaScript action blocks are not a substitute for the final extraction script.
+   - When extracting lists, return consistently structured records and remove obvious duplicates when appropriate.
 
-6. EXECUTION HANDLING & MONITORING:
-   - Dynamic parameters and transient states must be declared in 'variables' record object.
-   - Execute tasks via 'task_execute' tool, passing variable values to override defaults.
-   - Track executions using 'execution_list' or stream results. If an execution fails, inspect the step sequence, adjust the target selector or increase the 'wait' duration, and retry.
+6. DYNAMIC VALUES:
+   - Values that depend on execution time, such as 'today', 'last 7 days', or 'past 90 days', must remain dynamic.
+   - Do not hard-code the date observed while creating the task unless the user explicitly requests a fixed date.
+
+7. TARGET SELECTOR RESOLUTION:
+   - Prefer highly resilient selector strategies: ID-based selectors, robust CSS classes, XPath, ARIA roles, or reliable text matchers.
+   - Avoid brittle, highly nested selectors that break easily.
+   - For nested elements, check whether they reside inside Shadow DOMs and set 'includeShadowDom' appropriately.
+
+8. USER INTENT:
+   - Preserve intentional ambiguity when it represents a reasonable implementation choice.
+   - Do not invent unnecessary requirements, but make sensible implementation decisions when needed to complete the task.
+
+9. EXECUTION HANDLING & MONITORING:
+   - Execute tasks via 'task_execute', passing only genuine input variable overrides.
+   - Runtime/transient state that is created mid-task should normally be created or updated with Set Variable rather than predeclared as a task input.
+   - Track executions using 'execution_list' or stream results. If an execution or its result is wrong, inspect the task, fix the relevant source/action/selector/extraction logic, and retry.
 =========================================
 `;
 
@@ -123,7 +146,7 @@ const ActionSchema = z.object({
   value: z.string().optional().describe("Input value or configuration value for this action. Supports variable templating. MUST use '{$variable_name}' syntax for variable references (e.g., '{$myVar}'). NEVER use '{{variable_name}}' or '${variable_name}'. Expected type: string. Example: 'hello@world.com'"),
   key: z.string().optional().describe("The key name to press for 'press' actions, or config variable keys. Expected type: string. Example: 'Enter'"),
   disabled: z.boolean().optional().default(false).describe("Skip execution of this step if set to true. Expected type: boolean. Example: false"),
-  varName: z.string().optional().describe("Variable name to store output data or extracted content in. Expected type: string. Example: 'extractedTitle'"),
+  varName: z.string().optional().describe("Runtime variable name used by actions such as Set Variable, merge, or foreach. Set Variable may create or update this runtime variable. Do not use varName as the schema for final task outputs; use extractionScript for final extraction."),
   conditionVar: z.string().optional().describe("Variable to evaluate for conditional steps (if, while). Expected type: string. Example: 'isLoggedIn'"),
   conditionVarType: z.enum(['string', 'number', 'boolean']).optional().describe("The type of the condition variable to evaluate. Expected type: string enum. Example: 'boolean'"),
   conditionOp: z.string().optional().describe("Operator for conditional comparison (e.g., '==', '!=', 'contains', '>', '<'). Expected type: string. Example: '=='"),
@@ -142,7 +165,7 @@ const VariableSchema = z.object({
   type: z.enum(['string', 'number', 'boolean']).describe("The data type of the stored variable. Expected type: string enum. Example: 'string'"),
   value: z.any().describe("The initial value of the variable. Expected type: any. Example: 'John Doe'"),
   autoCreated: z.boolean().optional().default(false).describe("Indicates if the variable was automatically declared by the system. Expected type: boolean. Example: false")
-}).describe("Configures state variables accessible throughout the task execution.");
+}).describe("Configures task input variables and caller-overridable values. Do not declare output-only fields here; use Set Variable for mid-task runtime state and extractionScript for final outputs.");
 
 const TaskScheduleSchema = z.object({
   enabled: z.boolean().describe("Whether the task schedule is active. Expected type: boolean. Example: true"),
@@ -167,8 +190,8 @@ const CreateTaskSchema = z.object({
   humanTyping: z.boolean().default(false).describe("Vary typing speeds to simulate organic human typing. Expected type: boolean. Example: true"),
   stealth: StealthConfigSchema.optional().describe("Realistic human behavior configurations. Expected type: object."),
   actions: z.array(ActionSchema).default([]).describe("Sequential list of browser actions/control flow steps to execute. Action blocks require 'agent' or 'headful' mode and are not supported in 'scrape' mode. Expected type: array of action objects."),
-  variables: z.record(VariableSchema).default({}).describe("Task variables to store state and dynamic values. Expected type: record object of variable configurations."),
-  extractionScript: z.string().optional().describe("Optional post-execution script to extract data. Expected type: string. Example: 'return Array.from(document.querySelectorAll(\"a\")).map(el => el.href)'"),
+  variables: z.record(VariableSchema).default({}).describe("Task INPUT variables and caller-overridable configuration only. Do not declare output-only fields or transient runtime state here. Use Set Variable for mid-task state. Expected type: record object of variable configurations."),
+  extractionScript: z.string().optional().describe("Post-execution extraction script for the task's actual final output. Final structured fields, lists, tables, parsing, and extraction logic belong here rather than in task variables or JavaScript action blocks. Expected type: string. Example: 'return Array.from(document.querySelectorAll(\"a\")).map(el => el.href)'"),
   extractionFormat: z.enum(['json', 'csv']).optional().default('json').describe("Target export format of any extracted data. Expected type: string enum. Example: 'json'"),
   includeHtml: z.boolean().optional().default(false).describe("Whether to include the raw page HTML in the execution response. Expected type: boolean. Example: false"),
   includeShadowDom: z.boolean().optional().default(true).describe("Whether to parse and resolve target elements residing in Shadow DOMs. Expected type: boolean. Example: true"),
@@ -338,7 +361,7 @@ const TASK_JSON_SCHEMA = {
           },
           varName: {
             type: "string",
-            description: "Variable name to store output data or extracted content in. Expected type: string. Example: 'extractedTitle'"
+            description: "Runtime variable name used by actions such as Set Variable, merge, or foreach. Set Variable may create or update this runtime variable. Do not use varName as the schema for final task outputs; use extractionScript for final extraction."
           },
           conditionVar: {
             type: "string",
@@ -399,10 +422,10 @@ const TASK_JSON_SCHEMA = {
     },
     variables: {
       type: "object",
-      description: "Task variables to store state and dynamic values. Expected type: record object of variable configurations.",
+      description: "Task INPUT variables and caller-overridable configuration only. Do not declare output-only fields or transient runtime state here. Use Set Variable for mid-task state. Expected type: record object of variable configurations.",
       additionalProperties: {
         type: "object",
-        description: "Configures state variables accessible throughout the task execution.",
+        description: "Configures task input variables and caller-overridable values. Do not declare output-only fields here; use Set Variable for mid-task runtime state and extractionScript for final outputs.",
         properties: {
           type: {
             type: "string",
@@ -423,7 +446,7 @@ const TASK_JSON_SCHEMA = {
     },
     extractionScript: {
       type: "string",
-      description: "Optional post-execution script to extract data. Expected type: string. Example: 'return Array.from(document.querySelectorAll(\"a\")).map(el => el.href)'"
+      description: "Post-execution extraction script for the task's actual final output. Final structured fields, lists, tables, parsing, and extraction logic belong here rather than in task variables or JavaScript action blocks. Expected type: string. Example: 'return Array.from(document.querySelectorAll(\"a\")).map(el => el.href)'"
     },
     extractionFormat: {
       type: "string",
@@ -651,12 +674,7 @@ Fallback: If an element might be missing or slow to load, wrap the interaction i
       "value": "console.log('Finished scraping and navigated successfully.');"
     }
   ],
-  "variables": {
-    "hn_stories": {
-      "type": "string",
-      "value": "[]"
-    }
-  },
+  "variables": {},
   "extractionFormat": "json"
 }
 \`\`\`

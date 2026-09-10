@@ -312,3 +312,15 @@ Extract the visible text content (`innerText`) of a page or a specific element a
 - Prefer structured conditions for selectors (`exists` with selector).
 - Keep waits short; use 1-2s unless the target site is slow.
 - Always close block structures with `end`.
+## Task design and extraction rules
+
+- Treat task-level `variables` as inputs or caller-overridable configuration only. Output-only fields must not be declared as task variables unless they are also genuine inputs.
+- Use **Set Variable** for runtime values that are created or changed mid-task and referenced later. Set Variable can both create and update runtime variables.
+- Put actual final structured extraction, table parsing, and result shaping in `extractionScript`.
+- Prefer native Figranium actions. Use JavaScript actions only when scripting is genuinely required or native actions are not sufficiently reliable.
+- Prefer the simplest reliable workflow. Do not add duplicate task-level behavior, unused configuration, unnecessary waits/navigation/loops/variables, or duplicate On Execution/start blocks.
+- After executing a task, inspect the returned result itself. A `success` execution status is insufficient if the result is empty, malformed, irrelevant, duplicated, unexpectedly null, or otherwise fails the user's request; fix and rerun it.
+- If the user does not name a source, choose a source that directly represents the requested data and prefer reliable structured first-party/public APIs when appropriate.
+- Keep execution-time concepts such as "today", "last 7 days", and "past 90 days" dynamic unless the user asks for a fixed date.
+- Preserve reasonable ambiguity and make sensible implementation choices without inventing unnecessary requirements.
+
