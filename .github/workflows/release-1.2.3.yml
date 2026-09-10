@@ -1,0 +1,170 @@
+name: One-shot release v1.2.3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release-1.2.3.yml'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Apply task design guidance
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('src/mcp-server.ts')
+          s = p.read_text()
+
+          new_system = r'''const SYSTEM_INSTRUCTIONS = `
+=========================================
+FIGRANIUM TASK LIFECYCLE SYSTEM INSTRUCTIONS
+=========================================
+As the Figranium MCP Server, you oversee and orchestrate the complete lifecycle of browser automation tasks.
+Every task follows a strict execution pipeline that you must carefully construct and validate:
+
+1. VARIABLE TEMPLATING SYNTAX (HIGH PRIORITY):
+   - You MUST use '{$variable_name}' (with a single curly brace and dollar sign, e.g. {$myVar}) for variable references/templating inside action values, URLs, headers, or body fields.
+   - NEVER use double curly braces like '{{variable_name}}' or JavaScript-style templates, as these syntaxes are unsupported and will cause execution failures.
+   - Task-level variables are INPUTS or caller-overridable configuration only. Do not declare variables merely because the task returns fields with those names.
+   - Example: if a task accepts a starting price and returns a final price, the starting price may be a task variable; an output-only price field must not be declared as a task variable.
+   - Use the 'set' (Set Variable) action for values created or updated during execution and needed by later steps. Set Variable can both create a new runtime variable and update an existing one.
+
+2. MANDATORY AUTOMATIC TESTING:
+   - UNLESS EXPLICITLY PROMPTED BY THE USER NOT TO TEST, you MUST immediately test and verify newly created or updated tasks by calling the 'task_execute' tool right after calling 'create_task' or 'task_update'.
+   - AFTER TESTING A TASK, do not consider an execution successful merely because its execution status is 'success'.
+   - Inspect the actual returned result and verify that it meaningfully satisfies the user's request.
+   - If the output is empty, malformed, irrelevant, duplicated, unexpectedly null, or otherwise incorrect, fix the task and execute it again.
+
+3. TASK CREATION AND DESIGN:
+   - A task must have a 'name', an initial starting 'url', and an execution 'mode' ('scrape', 'agent', or 'headful').
+   - Use 'agent' mode by default, including for scraping tasks. Agent mode supports the 'actions' array and should be chosen for nearly all browser automation and extraction workflows.
+   - 'scrape' mode does NOT support action blocks. Use it only for exceptional cases that require extremely fast, action-free scraping.
+   - Use 'headful' mode for visible, interactive debug sessions.
+   - Prefer the simplest native Figranium workflow that reliably satisfies the request.
+   - Do not add actions that duplicate task-level behavior. In particular, do not add duplicate On Execution/start, wait, or navigate actions when the task-level start/navigation/wait behavior already performs that job.
+   - Do not add variables, waits, navigation, JavaScript, loops, or other blocks unless they serve a concrete purpose.
+   - Do not create configuration options the task does not actually use.
+   - Prefer native Figranium actions over JavaScript. Use JavaScript blocks only when the task genuinely requires scripting or when normal actions are not sufficiently reliable.
+
+4. STEP SEQUENCE CONSTRUCTION (ACTIONS):
+   - Organize automation steps sequentially in the 'actions' array.
+   - Supported actions include page navigation ('navigate'), waiting ('wait', 'wait_selector'), element interaction ('click', 'type', 'hover', 'press'), script execution ('javascript'), control flow ('if', 'else', 'end', 'while', 'repeat', 'foreach'), and extraction helpers ('csv', 'get_content').
+   - Add a 'wait_selector' before click/type only when readiness is not already guaranteed and the wait serves a concrete reliability purpose.
+   - Always close opened block structures (e.g. 'if', 'while', 'repeat', 'foreach') with a corresponding 'end' action step.
+
+5. SOURCE AND EXTRACTION:
+   - When the user does not specify a source, choose one that directly represents the requested data rather than fetching a broad unrelated dataset and filtering it afterward.
+   - Prefer structured first-party/public APIs when they provide the required information reliably.
+   - Final task outputs belong in the task's 'extractionScript' field. Do not model final output fields as task variables.
+   - Final result table parsing and final structured extraction must be implemented in 'extractionScript'; JavaScript action blocks are not a substitute for the final extraction script.
+   - When extracting lists, return consistently structured records and remove obvious duplicates when appropriate.
+
+6. DYNAMIC VALUES:
+   - Values that depend on execution time, such as 'today', 'last 7 days', or 'past 90 days', must remain dynamic.
+   - Do not hard-code the date observed while creating the task unless the user explicitly requests a fixed date.
+
+7. TARGET SELECTOR RESOLUTION:
+   - Prefer highly resilient selector strategies: ID-based selectors, robust CSS classes, XPath, ARIA roles, or reliable text matchers.
+   - Avoid brittle, highly nested selectors that break easily.
+   - For nested elements, check whether they reside inside Shadow DOMs and set 'includeShadowDom' appropriately.
+
+8. USER INTENT:
+   - Preserve intentional ambiguity when it represents a reasonable implementation choice.
+   - Do not invent unnecessary requirements, but make sensible implementation decisions when needed to complete the task.
+
+9. EXECUTION HANDLING & MONITORING:
+   - Execute tasks via 'task_execute', passing only genuine input variable overrides.
+   - Runtime/transient state that is created mid-task should normally be created or updated with Set Variable rather than predeclared as a task input.
+   - Track executions using 'execution_list' or stream results. If an execution or its result is wrong, inspect the task, fix the relevant source/action/selector/extraction logic, and retry.
+=========================================
+`;'''
+
+          s2, n = re.subn(r"const SYSTEM_INSTRUCTIONS = `.*?\n`;", new_system, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('Could not replace SYSTEM_INSTRUCTIONS')
+          s = s2
+
+          replacements = {
+            'Variable name to store output data or extracted content in. Expected type: string. Example: \'extractedTitle\'': 'Runtime variable name used by actions such as Set Variable, merge, or foreach. Set Variable may create or update this runtime variable. Do not use varName as the schema for final task outputs; use extractionScript for final extraction.',
+            'Configures state variables accessible throughout the task execution.': 'Configures task input variables and caller-overridable values. Do not declare output-only fields here; use Set Variable for mid-task runtime state and extractionScript for final outputs.',
+            'Task variables to store state and dynamic values. Expected type: record object of variable configurations.': 'Task INPUT variables and caller-overridable configuration only. Do not declare output-only fields or transient runtime state here. Use Set Variable for mid-task state. Expected type: record object of variable configurations.',
+            'Optional post-execution script to extract data. Expected type: string. Example: \'return Array.from(document.querySelectorAll(\\\"a\\\")).map(el => el.href)\'': 'Post-execution extraction script for the task\'s actual final output. Final structured fields, lists, tables, parsing, and extraction logic belong here rather than in task variables or JavaScript action blocks. Expected type: string. Example: \'return Array.from(document.querySelectorAll(\\\"a\\\")).map(el => el.href)\'',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'Missing expected schema text: {old[:60]}')
+              s = s.replace(old, new)
+
+          # Remove the misleading output-as-variable example if still present.
+          s = re.sub(r'\n  "variables": \{\n    "hn_stories": \{\n      "type": "string",\n      "value": "\[\]"\n    \}\n  \},', '\n  "variables": {},', s, count=1)
+          p.write_text(s)
+
+          spec = Path('AGENT_SPEC.md')
+          a = spec.read_text()
+          marker = '## Task design and extraction rules'
+          guidance = r'''
+
+## Task design and extraction rules
+
+- Treat task-level `variables` as inputs or caller-overridable configuration only. Output-only fields must not be declared as task variables unless they are also genuine inputs.
+- Use **Set Variable** for runtime values that are created or changed mid-task and referenced later. Set Variable can both create and update runtime variables.
+- Put actual final structured extraction, table parsing, and result shaping in `extractionScript`.
+- Prefer native Figranium actions. Use JavaScript actions only when scripting is genuinely required or native actions are not sufficiently reliable.
+- Prefer the simplest reliable workflow. Do not add duplicate task-level behavior, unused configuration, unnecessary waits/navigation/loops/variables, or duplicate On Execution/start blocks.
+- After executing a task, inspect the returned result itself. A `success` execution status is insufficient if the result is empty, malformed, irrelevant, duplicated, unexpectedly null, or otherwise fails the user's request; fix and rerun it.
+- If the user does not name a source, choose a source that directly represents the requested data and prefer reliable structured first-party/public APIs when appropriate.
+- Keep execution-time concepts such as "today", "last 7 days", and "past 90 days" dynamic unless the user asks for a fixed date.
+- Preserve reasonable ambiguity and make sensible implementation choices without inventing unnecessary requirements.
+'''
+          if marker not in a:
+              spec.write_text(a.rstrip() + guidance + '\n')
+          PY
+
+      - name: Bump package version
+        run: npm version 1.2.3 --no-git-tag-version
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Commit release changes and remove one-shot workflow
+        shell: bash
+        run: |
+          rm .github/workflows/release-1.2.3.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "release: v1.2.3 task design guidance"
+          git push origin HEAD:main
+
+      - name: Tag release
+        run: |
+          git tag -a v1.2.3 -m "v1.2.3"
+          git push origin v1.2.3
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1.2.3 --title "v1.2.3" --notes $'### Agent task design guidance\n\n- Treat task variables as inputs/configuration rather than output fields.\n- Use Set Variable for runtime state; it can create or update variables.\n- Require final structured extraction and table parsing in Extraction Script.\n- Prefer native Figranium actions over unnecessary JavaScript and duplicate blocks.\n- Verify actual task results after execution instead of trusting status alone.\n- Prefer direct/reliable sources, structured list output, and deduplication where appropriate.\n- Keep execution-time values dynamic and preserve reasonable user intent ambiguity.'
