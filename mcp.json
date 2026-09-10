@@ -1,0 +1,14 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "figranium": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "figranium-mcp"],
+      "env": {
+        "FIGRANIUM_BASE_URL": "{{env.FIGRANIUM_BASE_URL}}",
+        "FIGRANIUM_API_KEY": "{{env.FIGRANIUM_API_KEY}}"
+      }
+    }
+  }
+}
