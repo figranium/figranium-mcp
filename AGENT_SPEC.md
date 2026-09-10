@@ -54,6 +54,10 @@ Common fields:
 - `varName` (string): target variable for `set`, `merge`, `foreach`.
 - `conditionVar`, `conditionVarType`, `conditionOp`, `conditionValue`: structured conditions for `if` and `while`.
 
+### Execution-block rules
+- NEVER create duplicate **On Execution** blocks/triggers. A task must have a single execution entry point. When updating an existing task, preserve and reuse the existing On Execution block instead of adding another one.
+- NEVER put blocking waits or `navigate` actions inside **On Execution**. Keep the trigger itself minimal and place navigation/wait steps in the normal sequential action flow after the execution entry point.
+
 ## 3) Variable templating
 Any string can include `{$varName}` tokens.
 Example:
@@ -80,6 +84,8 @@ return { title };
 
 ## 5) Extraction scripts (task-level)
 You can set `extractionScript` and `extractionFormat` at the task level. The extraction script runs **after** the page is processed and uses the same page-context rules as `javascript` actions (no `page` object).
+
+**Important:** final result table parsing/extraction only works when the parsing/extraction logic is in the task-level `extractionScript` field. A normal `javascript`, `csv`, or `get_content` action does not populate the final result table. If the user expects structured final table output, put that logic in `extractionScript` and set the appropriate `extractionFormat`.
 
 Minimal example:
 ```json
@@ -295,6 +301,9 @@ Extract the visible text content (`innerText`) of a page or a specific element a
 - `varName`: Optional variable name to store the result. Also available as `{$block.output}` in the next action.
 
 ## 16) Notes for AI agents
+- NEVER create duplicate **On Execution** blocks/triggers; preserve the single existing execution entry point when modifying a task.
+- NEVER put blocking waits or `navigate` actions inside **On Execution**; put them in the normal action flow after it.
+- Final result table parsing/extraction MUST live in task-level `extractionScript`; regular action blocks do not populate the final result table.
 - `javascript` actions are page-context only (no `page` object).
 - Prefer structured conditions for selectors (`exists` with selector).
 - Keep waits short; use 1-2s unless the target site is slow.
