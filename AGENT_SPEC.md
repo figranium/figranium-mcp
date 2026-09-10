@@ -54,9 +54,12 @@ Common fields:
 - `varName` (string): target variable for `set`, `merge`, `foreach`.
 - `conditionVar`, `conditionVarType`, `conditionOp`, `conditionValue`: structured conditions for `if` and `while`.
 
-### Execution-block rules
+### Initial execution rules
 - NEVER create duplicate **On Execution** blocks/triggers. A task must have a single execution entry point. When updating an existing task, preserve and reuse the existing On Execution block instead of adding another one.
-- NEVER put blocking waits or `navigate` actions inside **On Execution**. Keep the trigger itself minimal and place navigation/wait steps in the normal sequential action flow after the execution entry point.
+- Unless the user explicitly instructs otherwise, NEVER make `navigate` (**Navigate To**) or `wait` (**Wait**) the first action block. This restriction does NOT apply to `wait_selector` (**Wait for Selector**).
+- If the task should navigate to a URL when execution begins, put that URL in the task-level `url` field instead of adding an initial `navigate` action.
+- If the task should wait when execution begins, put that duration in the task-level `wait` field instead of adding an initial `wait` action.
+- Use `navigate` and `wait` action blocks later in the action sequence when navigation or waiting is needed after other steps have already run.
 
 ## 3) Variable templating
 Any string can include `{$varName}` tokens.
@@ -302,7 +305,8 @@ Extract the visible text content (`innerText`) of a page or a specific element a
 
 ## 16) Notes for AI agents
 - NEVER create duplicate **On Execution** blocks/triggers; preserve the single existing execution entry point when modifying a task.
-- NEVER put blocking waits or `navigate` actions inside **On Execution**; put them in the normal action flow after it.
+- Unless explicitly instructed otherwise, NEVER make `navigate` (**Navigate To**) or `wait` (**Wait**) the first action block. `wait_selector` (**Wait for Selector**) is allowed as the first action.
+- For navigation or a fixed wait at execution start, use the task-level `url` and `wait` fields instead of initial `navigate`/`wait` action blocks.
 - Final result table parsing/extraction MUST live in task-level `extractionScript`; regular action blocks do not populate the final result table.
 - `javascript` actions are page-context only (no `page` object).
 - Prefer structured conditions for selectors (`exists` with selector).
