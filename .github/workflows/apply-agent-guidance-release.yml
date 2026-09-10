@@ -27,85 +27,28 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
           p = Path('src/mcp-server.ts')
           s = p.read_text()
-
-          old = """6. EXECUTION HANDLING & MONITORING:\n   - Dynamic parameters and transient states must be declared in 'variables' record object.\n   - Execute tasks via 'task_execute' tool, passing variable values to override defaults.\n   - Track executions using 'execution_list' or stream results. If an execution fails, inspect the step sequence, adjust the target selector or increase the 'wait' duration, and retry."""
-          new = """6. VARIABLES, RUNTIME STATE & OUTPUTS:\n   - Task-level 'variables' are INPUTS/configuration only: declare a variable there only when the caller or user should provide or override it before execution. Do NOT declare output fields as task variables unless they are also genuine inputs (for example, an initial/starting value).\n   - Use the 'set' (Set Variable) action for values created or updated during execution and needed by later steps. Set Variable can both create a new runtime variable and update an existing one; runtime-only values do not need to be predeclared in task.variables.\n   - Final extracted outputs belong in 'extractionScript'. Fields such as price, title, email, rows, or other final results should be returned by the extraction script rather than modeled as task variables.\n   - Prefer native Figranium actions over 'javascript'. Use JavaScript only when the task genuinely requires scripting or when the corresponding normal actions are not sufficiently reliable.\n   - Execute tasks via 'task_execute' tool, passing variable values to override declared input defaults.\n   - Track executions using 'execution_list' or stream results. If an execution fails, inspect the step sequence, adjust the target selector or wait strategy, and retry."""
-          if old not in s:
-              raise SystemExit('system instruction target not found')
+          old = "6. EXECUTION HANDLING & MONITORING:\n   - Dynamic parameters and transient states must be declared in 'variables' record object.\n   - Execute tasks via 'task_execute' tool, passing variable values to override defaults.\n   - Track executions using 'execution_list' or stream results. If an execution fails, inspect the step sequence, adjust the target selector or increase the 'wait' duration, and retry."
+          new = "6. VARIABLES, RUNTIME STATE & OUTPUTS:\n   - Task-level 'variables' are INPUTS/configuration only: declare a variable there only when the caller or user should provide or override it before execution. Do NOT declare output fields as task variables unless they are also genuine inputs (for example, an initial/starting value).\n   - Use the 'set' (Set Variable) action for values created or updated during execution and needed by later steps. Set Variable can both create a new runtime variable and update an existing one; runtime-only values do not need to be predeclared in task.variables.\n   - Final extracted outputs belong in 'extractionScript'. Fields such as price, title, email, rows, or other final results should be returned by the extraction script rather than modeled as task variables.\n   - Prefer native Figranium actions over 'javascript'. Use JavaScript only when the task genuinely requires scripting or when the corresponding normal actions are not sufficiently reliable.\n   - Execute tasks via 'task_execute' tool, passing variable values to override declared input defaults.\n   - Track executions using 'execution_list' or stream results. If an execution fails, inspect the step sequence, adjust the target selector or wait strategy, and retry."
+          if old not in s: raise SystemExit('system instruction target not found')
           s = s.replace(old, new)
-
-          s = s.replace(
-            'Variable name to store output data or extracted content in. Expected type: string. Example: \'extractedTitle\'',
-            'Runtime variable name used by actions such as set/foreach and for intermediate values consumed by later steps. Do not use runtime variables as the final output schema; final extraction belongs in extractionScript. Expected type: string. Example: \'pageIndex\''
-          )
-          s = s.replace(
-            'Configures state variables accessible throughout the task execution.',
-            'Configures caller-provided task inputs/defaults. Do not declare final output fields here; use Set Variable for runtime-only state and extractionScript for final extracted results.'
-          )
-          s = s.replace(
-            'Task variables to store state and dynamic values. Expected type: record object of variable configurations.',
-            'Caller-provided task inputs/defaults only. Declare a variable here only when it should be supplied or overridden before execution. Do not use task variables for final outputs; use Set Variable for runtime-only state and extractionScript for final extracted results. Expected type: record object of variable configurations.'
-          )
-          s = s.replace(
-            'Optional post-execution script to extract data. Expected type: string. Example:',
-            'Post-execution script for the task\'s actual final extracted output. Return final fields/tables/objects here instead of modeling them as variables. Expected type: string. Example:'
-          )
-          s = s.replace(
-            "- 'javascript': Execute custom JavaScript on the page. Stored in 'value', outputs can be saved to 'varName'.",
-            "- 'javascript': Execute custom JavaScript on the page only when scripting is genuinely required or normal actions are not sufficiently reliable. Prefer native Figranium actions otherwise. Stored in 'value'; intermediate results may be saved to 'varName'."
-          )
-          s = s.replace(
-            "- 'set': Set or update a task variable.",
-            "- 'set': Create or update a runtime variable for intermediate state. It can create variables that are not predeclared in task.variables."
-          )
-
+          s = s.replace("Variable name to store output data or extracted content in. Expected type: string. Example: 'extractedTitle'", "Runtime variable name used by actions such as set/foreach and for intermediate values consumed by later steps. Do not use runtime variables as the final output schema; final extraction belongs in extractionScript. Expected type: string. Example: 'pageIndex'")
+          s = s.replace("Configures state variables accessible throughout the task execution.", "Configures caller-provided task inputs/defaults. Do not declare final output fields here; use Set Variable for runtime-only state and extractionScript for final extracted results.")
+          s = s.replace("Task variables to store state and dynamic values. Expected type: record object of variable configurations.", "Caller-provided task inputs/defaults only. Declare a variable here only when it should be supplied or overridden before execution. Do not use task variables for final outputs; use Set Variable for runtime-only state and extractionScript for final extracted results. Expected type: record object of variable configurations.")
+          s = s.replace("Optional post-execution script to extract data. Expected type: string. Example:", "Post-execution script for the task's actual final extracted output. Return final fields/tables/objects here instead of modeling them as variables. Expected type: string. Example:")
+          s = s.replace("- 'javascript': Execute custom JavaScript on the page. Stored in 'value', outputs can be saved to 'varName'.", "- 'javascript': Execute custom JavaScript on the page only when scripting is genuinely required or normal actions are not sufficiently reliable. Prefer native Figranium actions otherwise. Stored in 'value'; intermediate results may be saved to 'varName'.")
+          s = s.replace("- 'set': Set or update a task variable.", "- 'set': Create or update a runtime variable for intermediate state. It can create variables that are not predeclared in task.variables.")
           heading = '### !!! IMPORTANT GUIDELINES FOR LLM AGENTS !!!'
-          extra = '''### !!! IMPORTANT GUIDELINES FOR LLM AGENTS !!!
-0. **INPUTS VS RUNTIME STATE VS OUTPUTS**: `variables` is only for caller-provided inputs/defaults. Use `set` to create/update runtime-only state; it can create variables without predeclaring them. Put final extracted outputs in `extractionScript`; do not mirror output fields into `variables` unless they are genuinely inputs.
-0. **PREFER NATIVE ACTIONS**: Prefer normal Figranium actions over `javascript`. Use JavaScript only when the task genuinely requires scripting or native actions are not sufficiently reliable.'''
-          if heading not in s:
-              raise SystemExit('create-task guideline heading not found')
+          extra = heading + "\n0. **INPUTS VS RUNTIME STATE VS OUTPUTS**: `variables` is only for caller-provided inputs/defaults. Use `set` to create/update runtime-only state; it can create variables without predeclaring them. Put final extracted outputs in `extractionScript`; do not mirror output fields into `variables` unless they are genuinely inputs.\n0. **PREFER NATIVE ACTIONS**: Prefer normal Figranium actions over `javascript`. Use JavaScript only when the task genuinely requires scripting or native actions are not sufficiently reliable."
+          if heading not in s: raise SystemExit('create-task guideline heading not found')
           s = s.replace(heading, extra, 1)
-
-          old_example = '''    {
-      \"type\": \"javascript\",
-      \"value\": \"return Array.from(document.querySelectorAll('.athing')).map(tr => ({ id: tr.id, title: tr.querySelector('.titleline > a')?.innerText, href: tr.querySelector('.titleline > a')?.href }));\",
-      \"varName\": \"hn_stories\"
-    },'''
-          s = s.replace(old_example, '')
-          old_vars = '''  \"variables\": {
-    \"hn_stories\": {
-      \"type\": \"string\",
-      \"value\": \"[]\"
-    }
-  },
-  \"extractionFormat\": \"json\"'''
-          new_vars = '''  \"variables\": {},
-  \"extractionScript\": \"return Array.from(document.querySelectorAll('.athing')).map(tr => ({ id: tr.id, title: tr.querySelector('.titleline > a')?.innerText, href: tr.querySelector('.titleline > a')?.href }));\",
-  \"extractionFormat\": \"json\"'''
-          if old_vars not in s:
-              raise SystemExit('example variables target not found')
-          s = s.replace(old_vars, new_vars)
           p.write_text(s)
-
           spec = Path('AGENT_SPEC.md')
           t = spec.read_text()
-          section = '''
-
-## Variable and extraction authoring rules
-
-- Treat task-level `variables` as caller-provided inputs/configuration only. Declare a variable there only when a user or API caller should be able to supply or override it before execution. Do not create variables merely because a task returns fields with those names.
-- Use **Set Variable** (`set`) for runtime-only/intermediate state. It can create a new runtime variable or update an existing one; runtime-only variables do not need to be predeclared in `task.variables`.
-- Put actual final extraction logic and structured output in `extractionScript`. Output fields such as `price`, `title`, `email`, or table rows should come from the extraction script unless they are independently meaningful inputs.
-- Prefer native Figranium actions over `javascript` blocks. Use JavaScript only when the task genuinely requires scripting or the normal action is not sufficiently reliable.
-'''
-          if '## Variable and extraction authoring rules' not in t:
-              spec.write_text(t.rstrip() + section + '\n')
+          section = "\n\n## Variable and extraction authoring rules\n\n- Treat task-level `variables` as caller-provided inputs/configuration only. Declare a variable there only when a user or API caller should be able to supply or override it before execution. Do not create variables merely because a task returns fields with those names.\n- Use **Set Variable** (`set`) for runtime-only/intermediate state. It can create a new runtime variable or update an existing one; runtime-only variables do not need to be predeclared in `task.variables`.\n- Put actual final extraction logic and structured output in `extractionScript`. Output fields such as `price`, `title`, `email`, or table rows should come from the extraction script unless they are independently meaningful inputs.\n- Prefer native Figranium actions over `javascript` blocks. Use JavaScript only when the task genuinely requires scripting or the normal action is not sufficiently reliable.\n"
+          if '## Variable and extraction authoring rules' not in t: spec.write_text(t.rstrip() + section + '\n')
           PY
-
           npm version 1.2.3 --no-git-tag-version
           npm ci
           npm run build
@@ -124,8 +67,7 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create v1.2.3 --repo "$GITHUB_REPOSITORY" --title 'v1.2.3' --notes $'### Agent authoring guidance\n\n- Clarified that task variables are caller-provided inputs/configuration, not output fields.\n- Clarified that Set Variable can create or update runtime-only variables without predeclaring them.\n- Clarified that final structured extraction belongs in `extractionScript`.\n- Instructed agents to prefer native Figranium actions and use JavaScript only when necessary or more reliable.\n- Updated the task schema descriptions and example to reinforce the same behavior.'
+        run: gh release create v1.2.3 --repo "$GITHUB_REPOSITORY" --title 'v1.2.3' --notes $'### Agent authoring guidance\n\n- Task variables are caller-provided inputs/configuration, not output fields.\n- Set Variable can create or update runtime-only variables without predeclaring them.\n- Final structured extraction belongs in `extractionScript`.\n- Agents should prefer native Figranium actions and use JavaScript only when necessary or more reliable.\n- Schema descriptions and the agent spec now reinforce the same behavior.'
 
       - name: Publish npm workflow
         env:
