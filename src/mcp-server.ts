@@ -71,7 +71,7 @@ Every task follows a strict execution pipeline that you must carefully construct
 
 4. STEP SEQUENCE CONSTRUCTION (ACTIONS):
    - Organize automation steps sequentially in the 'actions' array.
-   - Supported actions include page navigation ('navigate'), waiting ('wait', 'wait_selector'), element interaction ('click', 'type', 'hover', 'press'), script execution ('javascript'), control flow ('if', 'else', 'end', 'while', 'repeat', 'foreach'), and extraction helpers ('csv', 'get_content').
+   - Supported actions include page navigation ('navigate', 'reload'), waiting ('wait', 'wait_selector'), element interaction ('click', 'check', 'uncheck', 'drag_and_drop', 'select', 'type', 'hover', 'press'), script execution ('javascript'), control flow ('if', 'else', 'end', 'while', 'repeat', 'foreach'), and extraction helpers ('csv', 'get_content').
    - Add a 'wait_selector' before click/type only when readiness is not already guaranteed and the wait serves a concrete reliability purpose.
    - Always close opened block structures (e.g. 'if', 'while', 'repeat', 'foreach') with a corresponding 'end' action step.
 
@@ -108,7 +108,7 @@ Every task follows a strict execution pipeline that you must carefully construct
 const server = new Server(
   {
     name: "figranium-mcp-server",
-    version: "1.0.0",
+    version: "1.3.0",
     description: "Figranium MCP Server - Facilitates complete task creation, execution, schedule, and automation tracking.\n\n" + SYSTEM_INSTRUCTIONS,
   },
   {
@@ -140,7 +140,7 @@ const ActionSchema = z.object({
     'csv', 'hover', 'merge', 'screenshot', 'if', 'else', 'end', 'while',
     'repeat', 'foreach', 'stop', 'set', 'on_error', 'navigate', 'wait_downloads',
     'start', 'http_request', 'get_content', 'solve_captcha', 'wait_captcha',
-    'upload', 'finalize_uploads'
+    'upload', 'finalize_uploads', 'check', 'uncheck', 'drag_and_drop', 'reload', 'select', 'do_nothing'
   ]).describe("The action type to perform. Expected type: string enum. Example: 'click'"),
   selector: z.string().optional().describe("CSS selector, XPath, or ARIA locator for the target element. Required for click, type, hover, wait_selector. Expected type: string. Example: '#username'"),
   value: z.string().optional().describe("Input value or configuration value for this action. Supports variable templating. MUST use '{$variable_name}' syntax for variable references (e.g., '{$myVar}'). NEVER use '{{variable_name}}' or '${variable_name}'. Expected type: string. Example: 'hello@world.com'"),
@@ -152,6 +152,8 @@ const ActionSchema = z.object({
   conditionOp: z.string().optional().describe("Operator for conditional comparison (e.g., '==', '!=', 'contains', '>', '<'). Expected type: string. Example: '=='"),
   conditionValue: z.string().optional().describe("Value to compare the condition variable against. Expected type: string. Example: 'true'"),
   typeMode: z.enum(['append', 'replace']).optional().default('replace').describe("Whether to append text or clear/replace existing text during 'type' actions. Expected type: string enum. Example: 'replace'"),
+  clickType: z.enum(['single', 'double', 'right']).optional().default('single').describe("Click interaction mode for 'click': single, double, or right click. Expected type: string enum. Example: 'double'"),
+  targetSelector: z.string().optional().describe("Destination selector for 'drag_and_drop'. Required with a source 'selector'. Expected type: string. Example: '.done-column'"),
   method: z.string().optional().describe("HTTP method for 'http_request' actions. Expected type: string. Example: 'GET'"),
   headers: z.string().optional().describe("JSON stringified headers for 'http_request'. Supports variable templating. MUST use '{$variable_name}' syntax for variable references. Expected type: string. Example: '{\"Authorization\": \"Bearer {$token}\"}'"),
   body: z.string().optional().describe("Payload body for 'http_request' actions. Supports variable templating. MUST use '{$variable_name}' syntax for variable references. Expected type: string. Example: '{\"query\": \"{$value}\"}'"),
@@ -197,7 +199,11 @@ const CreateTaskSchema = z.object({
   includeShadowDom: z.boolean().optional().default(true).describe("Whether to parse and resolve target elements residing in Shadow DOMs. Expected type: boolean. Example: true"),
   disableRecording: z.boolean().optional().default(false).describe("Disable video/VNC recording of this task to save storage. Expected type: boolean. Example: true"),
   statelessExecution: z.boolean().optional().default(false).describe("If set to true, clear browser cookies and session states between runs. Expected type: boolean. Example: false"),
-  cabinetId: z.string().optional().describe("Cabinet used for intercepted downloads and 'upload' actions that omit their own cabinetId; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"),
+  translation: z.object({
+    enabled: z.boolean().describe("Enable rendered-page translation for Agent and headful runs. Expected type: boolean. Example: true"),
+    targetLanguage: z.string().describe("translate.js target language name. Expected type: string. Example: 'spanish'")
+  }).optional().describe("Optional page translation. It is disabled by default and is not available in Scrape mode."),
+  downloadCabinetId: z.string().optional().describe("Cabinet used for intercepted downloads; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"),
   schedule: TaskScheduleSchema.optional().describe("Task automatic execution schedule. Expected type: object.")
 }).describe("Reflects the full schema of a Figranium task creation payload.");
 
@@ -338,7 +344,7 @@ const TASK_JSON_SCHEMA = {
               "csv", "hover", "merge", "screenshot", "if", "else", "end", "while",
               "repeat", "foreach", "stop", "set", "on_error", "navigate", "wait_downloads",
               "start", "http_request", "get_content", "solve_captcha", "wait_captcha",
-              "upload", "finalize_uploads"
+              "upload", "finalize_uploads", "check", "uncheck", "drag_and_drop", "reload", "select", "do_nothing"
             ],
             description: "The action type to perform. Expected type: string enum. Example: 'click'"
           },
@@ -385,6 +391,16 @@ const TASK_JSON_SCHEMA = {
             enum: ["append", "replace"],
             default: "replace",
             description: "Whether to append text or clear/replace existing text during 'type' actions. Expected type: string enum. Example: 'replace'"
+          },
+          clickType: {
+            type: "string",
+            enum: ["single", "double", "right"],
+            default: "single",
+            description: "Click interaction mode for 'click': single, double, or right click. Expected type: string enum. Example: 'double'"
+          },
+          targetSelector: {
+            type: "string",
+            description: "Destination selector for 'drag_and_drop'. Required with a source 'selector'. Expected type: string. Example: '.done-column'"
           },
           method: {
             type: "string",
@@ -474,9 +490,18 @@ const TASK_JSON_SCHEMA = {
       default: false,
       description: "If set to true, clear browser cookies and session states between runs. Expected type: boolean. Example: false"
     },
-    cabinetId: {
+    translation: {
+      type: "object",
+      description: "Optional page translation for Agent and headful runs. It is disabled by default and is not available in Scrape mode.",
+      properties: {
+        enabled: { type: "boolean", description: "Enable rendered-page translation. Expected type: boolean. Example: true" },
+        targetLanguage: { type: "string", description: "translate.js target language name. Expected type: string. Example: 'spanish'" }
+      },
+      required: ["enabled", "targetLanguage"]
+    },
+    downloadCabinetId: {
       type: "string",
-      description: "Cabinet used for intercepted downloads and 'upload' actions that omit their own cabinetId; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"
+      description: "Cabinet used for intercepted downloads; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"
     },
     schedule: {
       type: "object",
@@ -600,7 +625,11 @@ Figranium tasks run as a linear sequence of steps defined in the 'actions' array
 - 'navigate': Redirect browser to a new URL specified in the 'value' field.
 - 'wait': Pause execution for N seconds specified in the 'value' field.
 - 'wait_selector': Pause until the DOM element matching 'selector' is rendered.
-- 'click': Simulate a realistic click on the element matching 'selector'.
+- 'click': Simulate a single, double, or right click on the element matching 'selector'; set 'clickType' to 'double' or 'right' when needed.
+- 'check' / 'uncheck': Idempotently set the checked state of a checkbox or radio control matching 'selector'.
+- 'drag_and_drop': Drag from 'selector' to the required 'targetSelector'.
+- 'reload': Reload the current page and wait for DOM content to load.
+- 'select': Choose an option from a native select using 'selector' and its option 'value'.
 - 'type': Type the 'value' into the 'selector' input element. Use 'typeMode' to clear/replace or append.
 - 'hover': Move mouse pointer to the element matching 'selector'.
 - 'press': Press a specific keyboard key (e.g., 'Enter') specified in the 'key' field.
@@ -989,7 +1018,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "list_cabinets",
-        description: "List all Cabinets (durable download queues) configured on the Figranium server, including their IDs, names, and item counts. Use this to find a cabinetId to reference in a task's 'cabinetId' field or an 'upload' action.",
+        description: "List all Cabinets (durable download queues) configured on the Figranium server, including their IDs, names, and item counts. Use this to find a Cabinet ID to reference in a Task's 'downloadCabinetId' field or an 'upload' action.",
         inputSchema: {
           type: "object",
           properties: {},

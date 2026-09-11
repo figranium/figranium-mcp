@@ -187,6 +187,8 @@ The server initializes with embedded guidelines for LLM agents detailing the tas
 * **`task_list`**: List all task IDs, names, and descriptions registered on the Figranium server.
 * **`task_execute`**: Run a saved task by `taskId` with optional variable overrides.
 
+The task schema supports Figranium v0.18 browser interactions: checked-state actions, drag and drop, page reloads, native select controls, and single/double/right-click modes. It also supports opt-in page translation through `translation: { enabled, targetLanguage }` for Agent and headful Tasks.
+
 ### Execution Operations
 
 * **`execution_list`**: Retrieve a summary of past task execution logs and statuses.
