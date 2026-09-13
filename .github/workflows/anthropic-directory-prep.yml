@@ -1,0 +1,108 @@
+name: Anthropic directory metadata prep
+
+on:
+  push:
+    paths:
+      - '.github/workflows/anthropic-directory-prep.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Patch MCP annotations and task-validation guidance
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('src/mcp-server.ts')
+          text = path.read_text()
+
+          text, n = re.subn(
+              r"2\. MANDATORY AUTOMATIC TESTING:\n(?:   - .*\n){4}",
+              "2. TASK VALIDATION:\n"
+              "   - Newly created or updated tasks should ordinarily be validated through a real execution unless the user asks not to run them.\n"
+              "   - Validation should consider the actual returned result, not only the execution status.\n"
+              "   - Empty, malformed, irrelevant, duplicated, or unexpectedly null output indicates that the task may need correction and another validation run.\n",
+              text,
+              count=1,
+          )
+          if n != 1:
+              raise SystemExit('Could not replace system task-validation guidance')
+
+          old = "description: \"Exhaustive task update structure for Figranium automation tasks. NOTE: You MUST use '{$variable_name}' variable referencing syntax, and you MUST automatically test your changes using 'task_execute' right after task update unless prompted not to.\"," 
+          new = "description: \"Exhaustive task update structure for Figranium automation tasks. NOTE: Use '{$variable_name}' variable referencing syntax. Updated tasks are ordinarily intended to be validated against a real execution result.\"," 
+          if old not in text:
+              raise SystemExit('Could not find task update schema description')
+          text = text.replace(old, new, 1)
+
+          old = "2. **MANDATORY AUTOMATIC TESTING**: Unless the user explicitly prompts you NOT to test, you MUST immediately test and verify your newly created or updated tasks by calling the `task_execute` tool right after calling `create_task` or `task_update`. Automatic testing is mandatory to ensure correctness."
+          new = "2. **TASK VALIDATION**: Newly created or updated tasks are ordinarily intended to be validated against a real execution result so configuration, selectors, and extracted output can be checked."
+          if old not in text:
+              raise SystemExit('Could not find create-task validation guidance')
+          text = text.replace(old, new, 1)
+
+          old = 'description: "Execute/run a saved automation task by ID and return its result.",'
+          new = 'description: "Execute a saved automation task by ID and return its real run result. This is also useful for validating newly created or updated tasks against actual browser behavior and output.",'
+          if old not in text:
+              raise SystemExit('Could not find task_execute description')
+          text = text.replace(old, new, 1)
+
+          start = text.index('server.setRequestHandler(ListToolsRequestSchema')
+          end = text.index('/**\n * Handle incoming tool executions', start)
+          head, block, tail = text[:start], text[start:end], text[end:]
+
+          annotations = {
+              'create_task': ('Create Task', False, False, False, False),
+              'task_update': ('Update Task', False, False, True, False),
+              'task_delete': ('Delete Task', False, True, True, False),
+              'task_list': ('List Tasks', True, False, True, False),
+              'browser_open': ('Open Browser', False, False, False, True),
+              'inspector_highlight': ('Highlight Browser Target', False, False, False, True),
+              'task_execute': ('Execute Task', False, True, False, True),
+              'execution_list': ('List Executions', True, False, True, False),
+              'schedule_list': ('List Schedules', True, False, True, False),
+              'schedule_get_all_status': ('Get Scheduler Status', True, False, True, False),
+              'schedule_get_status': ('Get Schedule Status', True, False, True, False),
+              'schedule_set': ('Set Schedule', False, False, True, False),
+              'schedule_delete': ('Delete Schedule', False, True, True, False),
+              'schedule_describe': ('Describe Schedule', True, False, True, False),
+              'list_cabinets': ('List Cabinets', True, False, True, False),
+              'create_cabinet': ('Create Cabinet', False, False, False, False),
+          }
+
+          for name, (title, ro, destructive, idem, open_world) in annotations.items():
+              pattern = rf'(name: "{re.escape(name)}",\n)(?!\s*annotations:)'
+              insertion = (
+                  rf'\1        annotations: {{ title: "{title}", readOnlyHint: {str(ro).lower()}, '
+                  rf'destructiveHint: {str(destructive).lower()}, idempotentHint: {str(idem).lower()}, '
+                  rf'openWorldHint: {str(open_world).lower()} }},\n'
+              )
+              block, count = re.subn(pattern, insertion, block, count=1)
+              if count != 1:
+                  raise SystemExit(f'Could not annotate tool {name}')
+
+          path.write_text(head + block + tail)
+          PY
+
+          npm ci
+          npm run build
+
+      - name: Commit patch and remove one-off workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/anthropic-directory-prep.yml
+          git add src/mcp-server.ts
+          git commit -m "Add MCP tool annotations for directory review"
+          git push
