@@ -52,11 +52,10 @@ Every task follows a strict execution pipeline that you must carefully construct
    - Example: if a task accepts a starting price and returns a final price, the starting price may be a task variable; an output-only price field must not be declared as a task variable.
    - Use the 'set' (Set Variable) action for values created or updated during execution and needed by later steps. Set Variable can both create a new runtime variable and update an existing one.
 
-2. MANDATORY AUTOMATIC TESTING:
-   - UNLESS EXPLICITLY PROMPTED BY THE USER NOT TO TEST, you MUST immediately test and verify newly created or updated tasks by calling the 'task_execute' tool right after calling 'create_task' or 'task_update'.
-   - AFTER TESTING A TASK, do not consider an execution successful merely because its execution status is 'success'.
-   - Inspect the actual returned result and verify that it meaningfully satisfies the user's request.
-   - If the output is empty, malformed, irrelevant, duplicated, unexpectedly null, or otherwise incorrect, fix the task and execute it again.
+2. TASK VALIDATION:
+   - Newly created or updated tasks should ordinarily be validated through a real execution unless the user asks not to run them.
+   - Validation should consider the actual returned result, not only the execution status.
+   - Empty, malformed, irrelevant, duplicated, or unexpectedly null output indicates that the task may need correction and another validation run.
 
 3. TASK CREATION AND DESIGN:
    - A task must have a 'name', an initial starting 'url', and an execution 'mode' ('scrape', 'agent', or 'headful').
@@ -596,7 +595,7 @@ const TASK_DELETE_JSON_SCHEMA = {
 
 const TASK_UPDATE_JSON_SCHEMA = {
   type: "object",
-  description: "Exhaustive task update structure for Figranium automation tasks. NOTE: You MUST use '{$variable_name}' variable referencing syntax, and you MUST automatically test your changes using 'task_execute' right after task update unless prompted not to.",
+  description: "Exhaustive task update structure for Figranium automation tasks. NOTE: Use '{$variable_name}' variable referencing syntax. Updated tasks are ordinarily intended to be validated against a real execution result.",
   properties: {
     taskId: {
       type: "string",
@@ -612,7 +611,7 @@ Create a complete, fully-configured Figranium automation task including sequenti
 
 ### !!! IMPORTANT GUIDELINES FOR LLM AGENTS !!!
 1. **VARIABLE TEMPLATING SYNTAX**: You MUST use \`{$variable_name}\` (with a single curly brace and dollar sign, e.g. \`{$myVar}\`) for variable references/templating inside action values, URLs, headers, or body fields. NEVER use double curly braces like \`{{variable_name}}\` or JavaScript-style templates like \`\${variable_name}\`, as these syntaxes are unsupported and will cause execution failures.
-2. **MANDATORY AUTOMATIC TESTING**: Unless the user explicitly prompts you NOT to test, you MUST immediately test and verify your newly created or updated tasks by calling the \`task_execute\` tool right after calling \`create_task\` or \`task_update\`. Automatic testing is mandatory to ensure correctness.
+2. **TASK VALIDATION**: Newly created or updated tasks are ordinarily intended to be validated against a real execution result so configuration, selectors, and extracted output can be checked.
 3. **MODE SELECTION**: Use \`agent\` mode by default, including for scraping tasks. \`scrape\` mode does not support action blocks and should be used only when extremely fast, action-free scraping is required. Use \`headful\` for visible interactive debugging.
 
 ### 1. Purpose
@@ -805,21 +804,25 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "create_task",
+        annotations: { title: "Create Task", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         description: CREATE_TASK_DESCRIPTION,
         inputSchema: TASK_JSON_SCHEMA,
       },
       {
         name: "task_update",
+        annotations: { title: "Update Task", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         description: "Update fields of an existing task on the Figranium server.",
         inputSchema: TASK_UPDATE_JSON_SCHEMA,
       },
       {
         name: "task_delete",
+        annotations: { title: "Delete Task", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         description: "Permanently delete a Figranium task by taskId.",
         inputSchema: TASK_DELETE_JSON_SCHEMA,
       },
       {
         name: "task_list",
+        annotations: { title: "List Tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         description: "List all task IDs, names, and descriptions from Figranium.",
         inputSchema: {
           type: "object",
@@ -828,17 +831,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "browser_open",
+        annotations: { title: "Open Browser", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         description: "Launch or reattach a managed headful/interactive browser session.",
         inputSchema: BROWSER_OPEN_JSON_SCHEMA,
       },
       {
         name: "inspector_highlight",
+        annotations: { title: "Highlight Browser Target", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         description: "Activate inspect/highlight mode on an active browser session with optional selector hints.",
         inputSchema: INSPECTOR_HIGHLIGHT_JSON_SCHEMA,
       },
       {
         name: "task_execute",
-        description: "Execute/run a saved automation task by ID and return its result.",
+        annotations: { title: "Execute Task", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+        description: "Execute a saved automation task by ID and return its real run result. This is also useful for validating newly created or updated tasks against actual browser behavior and output.",
         inputSchema: {
           type: "object",
           properties: {
@@ -859,6 +865,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "execution_list",
+        annotations: { title: "List Executions", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         description: "List a summary of all past execution records.",
         inputSchema: {
           type: "object",
@@ -867,6 +874,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "schedule_list",
+        annotations: { title: "List Schedules", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         description: "List all tasks that have schedules configured (enabled or not).",
         inputSchema: {
           type: "object",
@@ -875,6 +883,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "schedule_get_all_status",
+        annotations: { title: "Get Scheduler Status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         description: "Get overall scheduler status and metadata for all schedules.",
         inputSchema: {
           type: "object",
@@ -883,6 +892,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "schedule_get_status",
+        annotations: { title: "Get Schedule Status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         description: "Get the detailed schedule status, cron configuration, and next run time for a specific task.",
         inputSchema: {
           type: "object",
@@ -897,6 +907,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "schedule_set",
+        annotations: { title: "Set Schedule", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         description: "Create or update a schedule for a specific task.",
         inputSchema: {
           type: "object",
@@ -953,6 +964,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "schedule_delete",
+        annotations: { title: "Delete Schedule", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         description: "Disable and remove the schedule configuration from a specific task.",
         inputSchema: {
           type: "object",
@@ -967,6 +979,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "schedule_describe",
+        annotations: { title: "Describe Schedule", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         description: "Validate and preview/describe a schedule configuration without saving it.",
         inputSchema: {
           type: "object",
@@ -1018,6 +1031,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "list_cabinets",
+        annotations: { title: "List Cabinets", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         description: "List all Cabinets (durable download queues) configured on the Figranium server, including their IDs, names, and item counts. Use this to find a Cabinet ID to reference in a Task's 'downloadCabinetId' field or an 'upload' action.",
         inputSchema: {
           type: "object",
@@ -1026,6 +1040,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "create_cabinet",
+        annotations: { title: "Create Cabinet", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         description: "Create a new Cabinet (durable download queue) on the Figranium server.",
         inputSchema: {
           type: "object",
