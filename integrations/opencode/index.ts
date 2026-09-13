@@ -23,10 +23,13 @@ export const FigraniumPlugin: Plugin = async () => {
       cfg.mcp = {
         ...cfg.mcp,
         figranium: {
-          type: "remote",
+          type: "local",
+          command: ["npx", "-y", "figranium-mcp"],
           enabled: true,
-          url: "https://mcp.figranium.dev/mcp",
-          oauth: {},
+          environment: {
+            FIGRANIUM_BASE_URL: "{env:FIGRANIUM_BASE_URL}",
+            FIGRANIUM_API_KEY: "{env:FIGRANIUM_API_KEY}",
+          },
         },
       };
 
