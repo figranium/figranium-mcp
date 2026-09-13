@@ -1,6 +1,6 @@
 # Figranium for OpenCode
 
-Official OpenCode integration for [Figranium](https://figranium.dev). It adds the hosted Figranium MCP server, a Figranium agent, routing guidance, and a browser automation skill.
+Official OpenCode integration for [Figranium](https://figranium.dev). It adds the local Figranium MCP server over STDIO, a Figranium agent, routing guidance, and a browser automation skill.
 
 ## Install
 
@@ -12,23 +12,30 @@ opencode plugin add 'github:figranium/figranium-mcp#main::path:integrations/open
 
 Or add it to your OpenCode configuration using the same Git package spec.
 
-## Authenticate
+## Configure
 
-The plugin configures the hosted MCP endpoint automatically:
-
-`https://mcp.figranium.dev/mcp`
-
-Authenticate with:
+Set the Figranium instance URL and API key in your environment before starting OpenCode:
 
 ```bash
-opencode mcp auth figranium
+export FIGRANIUM_BASE_URL="http://localhost:11345"
+export FIGRANIUM_API_KEY="your-api-key"
 ```
 
-The OAuth page asks for your publicly reachable self-hosted Figranium instance URL and API key. OpenCode receives OAuth tokens; the underlying Figranium API key is not exposed to OpenCode.
+The plugin starts `figranium-mcp` locally with:
+
+```bash
+npx -y figranium-mcp
+```
+
+OpenCode communicates with it over MCP STDIO, so no hosted MCP service or OAuth flow is required.
+
+## Optional hosted MCP
+
+Figranium also provides `https://mcp.figranium.dev/mcp` for clients that require a remote MCP server. OpenCode does not need it for the default integration.
 
 ## What it adds
 
-- `figranium` remote MCP server
+- local `figranium` MCP server over STDIO
 - `figranium` agent for browser automation requests
 - `figranium-browser-automation` skill
 - routing guidance for task creation, execution, validation, scheduling, and Cabinets
