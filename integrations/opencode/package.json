@@ -1,0 +1,29 @@
+{
+  "name": "opencode-figranium",
+  "version": "0.1.0",
+  "description": "Official Figranium plugin for OpenCode, adding the hosted Figranium MCP server and browser automation guidance.",
+  "type": "module",
+  "main": "./index.ts",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "figranium",
+    "browser-automation",
+    "web-automation",
+    "mcp",
+    "playwright"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/figranium/figranium-mcp.git",
+    "directory": "integrations/opencode"
+  },
+  "homepage": "https://figranium.dev",
+  "author": {
+    "name": "Figranium"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  }
+}
