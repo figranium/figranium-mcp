@@ -45,11 +45,14 @@ jobs:
               raise SystemExit('Could not find task update schema description')
           text = text.replace(old, new, 1)
 
-          old = "2. **MANDATORY AUTOMATIC TESTING**: Unless the user explicitly prompts you NOT to test, you MUST immediately test and verify your newly created or updated tasks by calling the `task_execute` tool right after calling `create_task` or `task_update`. Automatic testing is mandatory to ensure correctness."
-          new = "2. **TASK VALIDATION**: Newly created or updated tasks are ordinarily intended to be validated against a real execution result so configuration, selectors, and extracted output can be checked."
-          if old not in text:
-              raise SystemExit('Could not find create-task validation guidance')
-          text = text.replace(old, new, 1)
+          text, n = re.subn(
+              r"2\. \*\*MANDATORY AUTOMATIC TESTING\*\*:.*?Automatic testing is mandatory to ensure correctness\.",
+              "2. **TASK VALIDATION**: Newly created or updated tasks are ordinarily intended to be validated against a real execution result so configuration, selectors, and extracted output can be checked.",
+              text,
+              count=1,
+          )
+          if n != 1:
+              raise SystemExit('Could not replace create-task validation guidance')
 
           old = 'description: "Execute/run a saved automation task by ID and return its result.",'
           new = 'description: "Execute a saved automation task by ID and return its real run result. This is also useful for validating newly created or updated tasks against actual browser behavior and output.",'
