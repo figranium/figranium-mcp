@@ -223,8 +223,15 @@ const TaskDeleteSchema = z.object({
 }).describe("Configuration for deleting an existing automation task.");
 
 const TaskUpdateSchema = CreateTaskSchema.partial().extend({
-  taskId: z.string().describe("The unique ID of the task to update. Expected type: string. Example: 'task_101'")
-}).describe("Reflects the schema of a Figranium task update payload.");
+  taskId: z.string().min(1).describe("The ID of the existing task to modify. Obtain it from task_list; this is the only required field. Expected type: non-empty string. Example: 'task_101'")
+}).superRefine((value, context) => {
+  if (Object.keys(value).some((key) => key !== "taskId")) return;
+  context.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: [],
+    message: "Provide taskId and at least one field to update; an ID-only request makes no change.",
+  });
+}).describe("A partial update for an existing Figranium task. taskId identifies the stored task; supply one or more mutable task fields to change.");
 
 /**
  * Rich formatted JSON Schema of a Figranium Task
@@ -595,16 +602,58 @@ const TASK_DELETE_JSON_SCHEMA = {
 
 const TASK_UPDATE_JSON_SCHEMA = {
   type: "object",
-  description: "Exhaustive task update structure for Figranium automation tasks. NOTE: Use '{$variable_name}' variable referencing syntax. Updated tasks are ordinarily intended to be validated against a real execution result.",
+  description: "Partially update a saved Figranium automation task. First use task_list to obtain taskId, then send taskId plus at least one field to change. Omitted fields are left unchanged. This operation persists the supplied values and is idempotent when repeated with the same payload. When supplying compound fields such as actions, variables, stealth, translation, or schedule, provide the complete intended value for that field. Use '{$variable_name}' (not '{{variable_name}}' or '${variable_name}') for variable references in URLs and action values. After changing browser behavior, selectors, actions, or extractionScript, use task_execute to validate the real result. Do not use this tool to delete a task; use task_delete instead.",
   properties: {
     taskId: {
       type: "string",
-      description: "The unique ID of the task to update."
+      minLength: 1,
+      description: "ID of the existing task to modify. Get it from task_list. Required; must be a non-empty string. Example: 'task_101'."
     },
     ...TASK_JSON_SCHEMA.properties
   },
-  required: ["taskId"]
+  required: ["taskId"],
+  anyOf: [
+    ...Object.keys(TASK_JSON_SCHEMA.properties).map((field) => ({ required: [field] }))
+  ],
+  examples: [
+    {
+      taskId: "task_101",
+      name: "Daily lead extractor"
+    },
+    {
+      taskId: "task_101",
+      actions: [
+        { type: "wait_selector", selector: "[data-testid='results']" },
+        { type: "click", selector: "a.next-page" }
+      ],
+      extractionScript: "return Array.from(document.querySelectorAll('.result')).map((el) => el.textContent?.trim());"
+    }
+  ]
 };
+
+const TASK_UPDATE_DESCRIPTION = `
+Update one or more fields on an existing, saved Figranium browser-automation task.
+
+### When to use
+Use this after \`task_list\` identifies the task to modify—for example, to correct its name or URL, replace its action sequence, change input variables, adjust stealth settings, or revise its extraction script or schedule. The task remains stored under the same \`taskId\` and is not executed by this operation.
+
+### Required request shape
+- \`taskId\` is required and must be the ID of an existing task.
+- Include at least one additional field. An ID-only request is rejected because it would make no change.
+- Every other field is optional: omitted fields are left unchanged.
+- Repeating the same request is safe and produces the same stored configuration.
+
+### Important update behavior
+- For compound fields—\`actions\`, \`variables\`, \`stealth\`, \`translation\`, and \`schedule\`—send the complete value you want stored for that field, rather than only a nested fragment.
+- \`actions\` are an ordered replacement sequence. Use \`agent\` or \`headful\` mode for actions; \`scrape\` mode does not support them. Close every \`if\`, \`while\`, \`repeat\`, or \`foreach\` block with an \`end\` action.
+- Use \`{$variable_name}\` for task-variable references in URLs, headers, bodies, and action values. Do not use \`{{variable_name}}\` or \`\${variable_name}\`.
+- This tool changes saved configuration but does not run or delete a task. Use \`task_execute\` to validate an updated workflow and \`task_delete\` only when permanent removal is intended.
+
+### Examples
+Rename a task: \`{ "taskId": "task_101", "name": "Daily lead extractor" }\`.
+
+Replace its workflow and output extraction: \`{ "taskId": "task_101", "actions": [{ "type": "wait_selector", "selector": "[data-testid='results']" }], "extractionScript": "return document.title" }\`.
+`;
 
 const CREATE_TASK_DESCRIPTION = `
 Create a complete, fully-configured Figranium automation task including sequential action steps, state variables, anti-bot stealth mechanisms, and optional scheduling.
@@ -811,7 +860,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "task_update",
         annotations: { title: "Update Task", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-        description: "Update fields of an existing task on the Figranium server.",
+        description: TASK_UPDATE_DESCRIPTION,
         inputSchema: TASK_UPDATE_JSON_SCHEMA,
       },
       {
