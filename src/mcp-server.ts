@@ -1272,9 +1272,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new McpError(ErrorCode.InvalidParams, "taskId is required");
         }
 
-        const response = await figranium.runTask(taskId, {
-          variables: variables || {},
-        });
+        // Browser automations routinely run longer than the SDK's default 30-second
+        // request timeout. Keep this request alive until Figranium returns the real
+        // execution result; MCP clients can apply their own cancellation/timeout.
+        const response = await figranium.runTask(
+          taskId,
+          {
+            variables: variables || {},
+          },
+          { timeoutMs: 0 },
+        );
 
         return {
           content: [
