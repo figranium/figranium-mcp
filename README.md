@@ -165,7 +165,7 @@ AI assistants (including Cline, Cursor, Claude Desktop, and Roo Code) can automa
 
 The server initializes with embedded guidelines for LLM agents detailing the task lifecycle:
 1. **Task Creation**: Structuring name, starting URL, execution mode, and stealth mechanisms. Agents should default to `agent` mode, including for scraping tasks. `scrape` mode does not support action blocks and is reserved for exceptional cases requiring extremely fast, action-free scraping; `headful` is intended for visible interactive debugging.
-2. **Step Sequence Construction**: Ordering action steps (`navigate`, `wait_selector`, `click`, `type`, `javascript`) and execution flow.
+2. **Step Sequence Construction**: Ordering action steps (`navigate`, `wait_selector`, `click`, `type`, `javascript`) and execution flow. The MCP rejects a first Timed Wait or Navigate To (use task-level `wait` and `url`) and a final Get Content action (use it as intermediate data or use `extractionScript` for final output).
 3. **Selector Strategy**: Preferring robust ARIA, ID, and semantic class selectors with fallback strategies.
 4. **Execution & Variables**: Injecting and overriding runtime context variables.
 

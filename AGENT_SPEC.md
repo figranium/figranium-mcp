@@ -56,10 +56,11 @@ Common fields:
 
 ### Initial execution rules
 - NEVER create duplicate **On Execution** blocks/triggers. A task must have a single execution entry point. When updating an existing task, preserve and reuse the existing On Execution block instead of adding another one.
-- Unless the user explicitly instructs otherwise, NEVER make `navigate` (**Navigate To**) or `wait` (**Wait**) the first action block. This restriction does NOT apply to `wait_selector` (**Wait for Selector**).
+- NEVER make `navigate` (**Navigate To**) or `wait` (**Timed Wait**) the first action block. This restriction does NOT apply to `wait_selector` (**Wait for Selector**).
 - If the task should navigate to a URL when execution begins, put that URL in the task-level `url` field instead of adding an initial `navigate` action.
 - If the task should wait when execution begins, put that duration in the task-level `wait` field instead of adding an initial `wait` action.
 - Use `navigate` and `wait` action blocks later in the action sequence when navigation or waiting is needed after other steps have already run.
+- NEVER make `get_content` (**Get Content**) the final action block. Its result must be used by a later action; use task-level `extractionScript` for final structured output.
 
 ## 3) Variable templating
 Any string can include `{$varName}` tokens.
@@ -302,11 +303,13 @@ Extract the visible text content (`innerText`) of a page or a specific element a
 ```
 - `selector`: Optional CSS selector. If omitted, returns the full page body text.
 - `varName`: Optional variable name to store the result. Also available as `{$block.output}` in the next action.
+- Because `get_content` is intermediate data, it cannot be the final action. Consume it in the next action, or put final extraction in `extractionScript`.
 
 ## 16) Notes for AI agents
 - NEVER create duplicate **On Execution** blocks/triggers; preserve the single existing execution entry point when modifying a task.
-- Unless explicitly instructed otherwise, NEVER make `navigate` (**Navigate To**) or `wait` (**Wait**) the first action block. `wait_selector` (**Wait for Selector**) is allowed as the first action.
+- NEVER make `navigate` (**Navigate To**) or `wait` (**Timed Wait**) the first action block. `wait_selector` (**Wait for Selector**) is allowed as the first action.
 - For navigation or a fixed wait at execution start, use the task-level `url` and `wait` fields instead of initial `navigate`/`wait` action blocks.
+- NEVER end an action sequence with `get_content`; consume that intermediate value in a later action, or use `extractionScript` for final structured extraction.
 - Final result table parsing/extraction MUST live in task-level `extractionScript`; regular action blocks do not populate the final result table.
 - `javascript` actions are page-context only (no `page` object).
 - Prefer structured conditions for selectors (`exists` with selector).
@@ -323,4 +326,3 @@ Extract the visible text content (`innerText`) of a page or a specific element a
 - If the user does not name a source, choose a source that directly represents the requested data and prefer reliable structured first-party/public APIs when appropriate.
 - Keep execution-time concepts such as "today", "last 7 days", and "past 90 days" dynamic unless the user asks for a fixed date.
 - Preserve reasonable ambiguity and make sensible implementation choices without inventing unnecessary requirements.
-

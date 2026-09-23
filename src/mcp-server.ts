@@ -18,6 +18,7 @@ import {
   type Task,
 } from "@figranium/sdk";
 import { z } from "zod";
+import { getWorkflowBoundaryIssues } from "./workflow-validation.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,6 +65,9 @@ Every task follows a strict execution pipeline that you must carefully construct
    - Use 'headful' mode for visible, interactive debug sessions.
    - Prefer the simplest native Figranium workflow that reliably satisfies the request.
    - Do not add actions that duplicate task-level behavior. In particular, do not add duplicate On Execution/start, wait, or navigate actions when the task-level start/navigation/wait behavior already performs that job.
+   - A Timed Wait ('wait') can never be the first action: it would delay every execution without waiting for a concrete event. Put that fixed initial delay in the task-level 'wait' field instead.
+   - Navigate To ('navigate') can never be the first action: the task-level 'url' is the initial navigation and keeps the task's starting point visible in its configuration.
+   - Get Content ('get_content') can never be the final action: its result must feed a later action. Put final structured extraction in 'extractionScript' instead.
    - Do not add variables, waits, navigation, JavaScript, loops, or other blocks unless they serve a concrete purpose.
    - Do not create configuration options the task does not actually use.
    - Prefer native Figranium actions over JavaScript. Use JavaScript blocks only when the task genuinely requires scripting or when normal actions are not sufficiently reliable.
@@ -162,6 +166,16 @@ const ActionSchema = z.object({
   markAsUploaded: z.boolean().optional().describe("When true, an 'upload' action marks its Cabinet item uploaded immediately after attaching it. Expected type: boolean. Example: false")
 }).describe("Represents a discrete automation step or flow-control operation executed in sequence. Variable reference MUST use '{$variable_name}' syntax.");
 
+const WorkflowActionsSchema = z.array(ActionSchema).superRefine((actions, context) => {
+  for (const issue of getWorkflowBoundaryIssues(actions)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [issue.index, 'type'],
+      message: issue.message,
+    });
+  }
+});
+
 const VariableSchema = z.object({
   type: z.enum(['string', 'number', 'boolean']).describe("The data type of the stored variable. Expected type: string enum. Example: 'string'"),
   value: z.any().describe("The initial value of the variable. Expected type: any. Example: 'John Doe'"),
@@ -190,7 +204,7 @@ const CreateTaskSchema = z.object({
   rotateViewport: z.boolean().default(false).describe("Vary viewport resolutions randomly to simulate multiple devices. Expected type: boolean. Example: true"),
   humanTyping: z.boolean().default(false).describe("Vary typing speeds to simulate organic human typing. Expected type: boolean. Example: true"),
   stealth: StealthConfigSchema.optional().describe("Realistic human behavior configurations. Expected type: object."),
-  actions: z.array(ActionSchema).default([]).describe("Sequential list of browser actions/control flow steps to execute. Action blocks require 'agent' or 'headful' mode and are not supported in 'scrape' mode. Expected type: array of action objects."),
+  actions: WorkflowActionsSchema.default([]).describe("Sequential list of browser actions/control flow steps to execute. Timed Wait and Navigate To cannot be the first action; Get Content cannot be the final action. Action blocks require 'agent' or 'headful' mode and are not supported in 'scrape' mode. Expected type: array of action objects."),
   variables: z.record(VariableSchema).default({}).describe("Task INPUT variables and caller-overridable configuration only. Do not declare output-only fields or transient runtime state here. Use Set Variable for mid-task state. Expected type: record object of variable configurations."),
   extractionScript: z.string().optional().describe("Post-execution extraction script for the task's actual final output. Final structured fields, lists, tables, parsing, and extraction logic belong here rather than in task variables or JavaScript action blocks. Expected type: string. Example: 'return Array.from(document.querySelectorAll(\"a\")).map(el => el.href)'"),
   extractionFormat: z.enum(['json', 'csv']).optional().default('json').describe("Target export format of any extracted data. Expected type: string enum. Example: 'json'"),
@@ -334,7 +348,7 @@ const TASK_JSON_SCHEMA = {
     },
     actions: {
       type: "array",
-      description: "Sequential list of browser actions/control flow steps to execute. Action blocks require 'agent' or 'headful' mode and are not supported in 'scrape' mode. Note: Variable references MUST use '{$variable_name}' syntax.",
+      description: "Sequential list of browser actions/control flow steps to execute. Timed Wait and Navigate To cannot be the first action because task-level wait and url define the starting state; Get Content cannot be the final action because its result must feed a later action or extractionScript. Action blocks require 'agent' or 'headful' mode and are not supported in 'scrape' mode. Note: Variable references MUST use '{$variable_name}' syntax.",
       items: {
         type: "object",
         description: "Represents a discrete automation step or flow-control operation executed in sequence. Variable reference MUST use '{$variable_name}' syntax.",
@@ -646,6 +660,7 @@ Use this after \`task_list\` identifies the task to modify—for example, to cor
 ### Important update behavior
 - For compound fields—\`actions\`, \`variables\`, \`stealth\`, \`translation\`, and \`schedule\`—send the complete value you want stored for that field, rather than only a nested fragment.
 - \`actions\` are an ordered replacement sequence. Use \`agent\` or \`headful\` mode for actions; \`scrape\` mode does not support them. Close every \`if\`, \`while\`, \`repeat\`, or \`foreach\` block with an \`end\` action.
+- A replacement sequence cannot start with Timed Wait or Navigate To: use task-level \`wait\` or \`url\` to establish the starting state. It also cannot end with Get Content: feed that value into a later action, or use \`extractionScript\` for final output.
 - Use \`{$variable_name}\` for task-variable references in URLs, headers, bodies, and action values. Do not use \`{{variable_name}}\` or \`\${variable_name}\`.
 - This tool changes saved configuration but does not run or delete a task. Use \`task_execute\` to validate an updated workflow and \`task_delete\` only when permanent removal is intended.
 
@@ -662,6 +677,7 @@ Create a complete, fully-configured Figranium automation task including sequenti
 1. **VARIABLE TEMPLATING SYNTAX**: You MUST use \`{$variable_name}\` (with a single curly brace and dollar sign, e.g. \`{$myVar}\`) for variable references/templating inside action values, URLs, headers, or body fields. NEVER use double curly braces like \`{{variable_name}}\` or JavaScript-style templates like \`\${variable_name}\`, as these syntaxes are unsupported and will cause execution failures.
 2. **TASK VALIDATION**: Newly created or updated tasks are ordinarily intended to be validated against a real execution result so configuration, selectors, and extracted output can be checked.
 3. **MODE SELECTION**: Use \`agent\` mode by default, including for scraping tasks. \`scrape\` mode does not support action blocks and should be used only when extremely fast, action-free scraping is required. Use \`headful\` for visible interactive debugging.
+4. **WORKFLOW BOUNDARIES**: Timed Wait and Navigate To cannot be the first action. A fixed initial delay belongs in task-level \`wait\`, and the initial destination belongs in task-level \`url\`. Get Content cannot be the final action because its value needs a consuming action; use \`extractionScript\` for final structured output.
 
 ### 1. Purpose
 Use this tool when you need to automate any recurring or complex web-based workflows, including data extraction (scraping), automated form-filling, dashboard testing, or dynamic visual monitoring. Tasks are stored permanently in Figranium and can be executed ad-hoc, triggered via API, or scheduled.
