@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
+    paths:
+      - '.github/workflows/npm-publish.yml'
   workflow_dispatch: {}
 
 permissions:
@@ -16,6 +20,7 @@ concurrency:
 
 jobs:
   publish:
+    if: startsWith(github.ref, 'refs/tags/') || github.event.head_commit.message == 'Trigger v1.3.3 npm publish'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -31,7 +36,7 @@ jobs:
           package-manager-cache: false
 
       - name: Verify tag matches package version
-        if: github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/')
         run: test "${GITHUB_REF_NAME}" = "v$(node -p "require('./package.json').version")"
 
       - name: Install dependencies
