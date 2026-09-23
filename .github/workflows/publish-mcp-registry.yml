@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
+    paths:
+      - '.github/workflows/publish-mcp-registry.yml'
   workflow_dispatch:
 
 permissions:
@@ -12,6 +16,7 @@ permissions:
 
 jobs:
   publish:
+    if: startsWith(github.ref, 'refs/tags/') || github.event.head_commit.message == 'Trigger v1.3.3 MCP Registry publish'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
