@@ -1,4 +1,5 @@
 name: Publish MCP Registry
+# Publish the corrected v1.3.3 registry manifest.
 
 on:
   push:
