@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="https://raw.githubusercontent.com/figranium/figranium-mcp/main/banner.png" alt="Figranium Banner">
+</div>
+
 # Figranium MCP Server
 
 [![NPM](https://img.shields.io/npm/v/figranium-mcp?label=NPM)](https://www.npmjs.com/package/figranium-mcp)
