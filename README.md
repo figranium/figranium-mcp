@@ -3,12 +3,12 @@
 
   <h1>Figranium MCP Server</h1>
 
-  <a href="https://www.npmjs.com/package/figranium-mcp"><img src="https://img.shields.io/npm/v/figranium-mcp?label=NPM" alt="NPM"></a>
-  <a href="https://glama.ai/mcp/servers/figranium/figranium-mcp"><img src="https://glama.ai/mcp/servers/figranium/figranium-mcp/badges/score.svg" alt="Glama quality and maintenance score"></a>
+  <a href="https://www.npmjs.com/package/figranium-mcp" target="_blank"><img src="https://img.shields.io/npm/v/figranium-mcp?label=NPM" alt="NPM"></a>
+  <a href="https://glama.ai/mcp/servers/figranium/figranium-mcp" target="_blank"><img src="https://glama.ai/mcp/servers/figranium/figranium-mcp/badges/score.svg" alt="Glama quality and maintenance score"></a>
 
   <p><strong>A Model Context Protocol (MCP) server for Figranium, built with `@modelcontextprotocol/sdk` and the official `@figranium/sdk` API client.</strong></p>
 
-  <p><a href="https://figranium.dev/docs"><strong>Documentation</strong></a></p>
+  <p><a href="https://figranium.dev/docs" target="_blank"><strong>Documentation</strong></a></p>
 </div>
 
 ## Table of Contents
@@ -236,7 +236,7 @@ If you wish to modify the source code or run without Docker:
 
 ```bash
 # Clone repository
-git clone [https://github.com/figranium/figranium-mcp.git](https://github.com/figranium/figranium-mcp.git)
+git clone <a href="https://github.com/figranium/figranium-mcp.git" target="_blank">https://github.com/figranium/figranium-mcp.git</a>
 cd figranium-mcp
 
 # Install dependencies and compile TypeScript
