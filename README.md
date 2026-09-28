@@ -1,13 +1,15 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/figranium/figranium-mcp/main/banner.png" alt="Figranium Banner">
+
+  <h1>Figranium MCP Server</h1>
+
+  <a href="https://www.npmjs.com/package/figranium-mcp"><img src="https://img.shields.io/npm/v/figranium-mcp?label=NPM&style=for-the-badge" alt="NPM"></a>
+  <a href="https://glama.ai/mcp/servers/figranium/figranium-mcp"><img src="https://glama.ai/mcp/servers/figranium/figranium-mcp/badges/score.svg" alt="Glama quality and maintenance score" height="28"></a>
+
+  <p><strong>A Model Context Protocol (MCP) server for Figranium, built with `@modelcontextprotocol/sdk` and the official `@figranium/sdk` API client.</strong></p>
+
+  <p><a href="https://figranium.dev/docs"><strong>Documentation</strong></a></p>
 </div>
-
-# Figranium MCP Server
-
-[![NPM](https://img.shields.io/npm/v/figranium-mcp?label=NPM)](https://www.npmjs.com/package/figranium-mcp)
-[![Figranium MCP Server MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/figranium/figranium-mcp/badges/score.svg)](https://glama.ai/mcp/servers/figranium/figranium-mcp)
-
-A Model Context Protocol (MCP) server for [Figranium](https://github.com/figranium/figranium), built with `@modelcontextprotocol/sdk` and the official `@figranium/sdk` API client. This server allows LLM clients (like Cline, Claude Desktop, Cursor, and Manus AI) to discover, execute, inspect, schedule, and programmatically create Figranium automation tasks via standard STDIO transport.
 
 ## Table of Contents
 - [Quick Start (Docker / OCI)](#quick-start-docker--oci)
