@@ -6,7 +6,7 @@
   <a href="https://www.npmjs.com/package/figranium-mcp" target="_blank"><img src="https://img.shields.io/npm/v/figranium-mcp?label=NPM" alt="NPM"></a>
   <a href="https://glama.ai/mcp/servers/figranium/figranium-mcp" target="_blank"><img src="https://glama.ai/mcp/servers/figranium/figranium-mcp/badges/score.svg" alt="Glama quality and maintenance score"></a>
 
-  <p><strong>A Model Context Protocol (MCP) server for Figranium, built with `@modelcontextprotocol/sdk` and the official `@figranium/sdk` API client.</strong></p>
+  <p><strong>The official Model Context Protocol (MCP) server for Figranium, built with the official Figranium JavaScript SDK API client.</strong></p>
 
   <p><a href="https://figranium.dev/docs" target="_blank"><strong>Documentation</strong></a></p>
 </div>
