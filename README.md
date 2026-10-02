@@ -31,7 +31,7 @@
 
 ---
 
-## Quick Start (Docker / OCI)
+## Quickstart
 
 No Node.js runtime or repository clone is required. The official container image is published on GitHub Container Registry (`ghcr.io`).
 
