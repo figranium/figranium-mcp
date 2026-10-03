@@ -111,7 +111,7 @@ Every task follows a strict execution pipeline that you must carefully construct
 const server = new Server(
   {
     name: "figranium-mcp-server",
-    version: "1.3.0",
+    version: "1.4.0",
     description: "Figranium MCP Server - Facilitates complete task creation, execution, schedule, and automation tracking.\n\n" + SYSTEM_INSTRUCTIONS,
   },
   {
@@ -868,6 +868,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
+        name: "template_search",
+        annotations: { title: "Search Templates", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        description: "Search the Figranium v0.20 template catalog with pagination.",
+        inputSchema: { type: "object", properties: {
+          search: { type: "string" }, category: { type: "string" },
+          sort: { type: "string", enum: ["popular", "newest", "name"] },
+          limit: { type: "integer", minimum: 1, maximum: 24 },
+          offset: { type: "integer", minimum: 0 }
+        } }
+      },
+      {
+        name: "template_get",
+        annotations: { title: "Get Template", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        description: "Retrieve the full template workflow and README by UUID.",
+        inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] }
+      },
+
+      {
         name: "create_task",
         annotations: { title: "Create Task", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         description: CREATE_TASK_DESCRIPTION,
@@ -1130,6 +1148,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (name) {
+      case "template_search": {
+        const query = z.object({
+          search: z.string().max(100).optional(), category: z.string().max(60).optional(),
+          sort: z.enum(["popular", "newest", "name"]).optional(),
+          limit: z.number().int().min(1).max(24).optional(),
+          offset: z.number().int().min(0).optional()
+        }).parse(args || {});
+        const params = new URLSearchParams({ limit: String(query.limit ?? 12), offset: String(query.offset ?? 0),
+          sort: query.sort ?? "popular", category: query.category ?? "all", search: query.search ?? "" });
+        const response = await fetch(`${BASE_URL}/api/templates?${params}`, {
+          headers: { "x-api-key": API_KEY, accept: "application/json" }
+        });
+        if (!response.ok) throw new Error(`Template catalog request failed (${response.status})`);
+        return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
+      }
+      case "template_get": {
+        const { id } = z.object({ id: z.string().uuid() }).parse(args || {});
+        const response = await fetch(`${BASE_URL}/api/templates/${encodeURIComponent(id)}`, {
+          headers: { "x-api-key": API_KEY, accept: "application/json" }
+        });
+        if (!response.ok) throw new Error(`Template retrieval failed (${response.status})`);
+        return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
+      }
+
       case "create_task": {
         // Validate with Zod schema for fine-grained error diagnostic feedback
         const parseResult = CreateTaskSchema.safeParse(args || {});
