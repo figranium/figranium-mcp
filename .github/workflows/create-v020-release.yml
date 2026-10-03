@@ -1,0 +1,24 @@
+name: Create v1.4.0 GitHub release
+on:
+  push:
+    paths:
+      - .github/workflows/create-v020-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Create GitHub release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.4.0 >/dev/null 2>&1; then
+            echo "Release v1.4.0 already exists"
+          else
+            gh release create v1.4.0 --target main --title "v1.4.0" --generate-notes
+          fi
