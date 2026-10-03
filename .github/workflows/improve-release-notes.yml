@@ -15,19 +15,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > /tmp/release-notes.md <<'RELEASE_NOTES_EOF'
-# Figranium MCP v1.4.0
+          # Figranium MCP v1.4.0
 
-Adds MCP tools for discovering and inspecting the Templates catalog introduced in Figranium v0.20.
+          Adds MCP tools for discovering and inspecting the Templates catalog introduced in Figranium v0.20.
 
-## What's new
+          ## What's new
 
-- **`template_search`:** Search the template catalog using `search`, `category`, `sort` (`popular`, `newest`, `name`), `limit` and `offset`. Returns the server's paginated catalog response.
-- **`template_get`:** Retrieve a template's full details using its UUID.
-- **SDK dependency:** Updated the MCP package to require `@figranium/sdk ^0.4.0`; the regenerated lockfile resolves version `0.4.0`.
-- **Version:** The MCP server and package version are now `1.4.0`.
+          - **`template_search`:** Search the template catalog using `search`, `category`, `sort` (`popular`, `newest`, `name`), `limit` and `offset`. Returns the server's paginated catalog response.
+          - **`template_get`:** Retrieve a template's full details using its UUID.
+          - **SDK dependency:** Updated the MCP package to require `@figranium/sdk ^0.4.0`; the regenerated lockfile resolves version `0.4.0`.
+          - **Version:** The MCP server and package version are now `1.4.0`.
 
-**Scope:** This release provides template discovery and retrieval, not an MCP tool that imports templates or records their download count. Task creation remains available through the existing task tools.
+          **Scope:** This release provides template discovery and retrieval, not an MCP tool that imports templates or records their download count. Task creation remains available through the existing task tools.
 
-See [CHANGELOG.md](https://github.com/figranium/figranium-mcp/blob/main/CHANGELOG.md) for release history.
-RELEASE_NOTES_EOF
+          See [CHANGELOG.md](https://github.com/figranium/figranium-mcp/blob/main/CHANGELOG.md) for release history.
+          RELEASE_NOTES_EOF
           gh release edit v1.4.0 --notes-file /tmp/release-notes.md
