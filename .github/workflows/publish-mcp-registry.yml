@@ -1,14 +1,10 @@
 name: Publish MCP Registry
-# Publish the corrected v1.3.3 registry manifest.
+# Publish the current registry manifest.
 
 on:
   push:
     tags:
       - 'v*'
-    branches:
-      - main
-    paths:
-      - '.github/workflows/publish-mcp-registry.yml'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +13,7 @@ permissions:
 
 jobs:
   publish:
-    if: startsWith(github.ref, 'refs/tags/') || github.event.head_commit.message == 'Trigger v1.4.0 MCP Registry publish'
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
