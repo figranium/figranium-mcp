@@ -11,136 +11,33 @@
   <p><a href="https://figranium.dev/docs" target="_blank"><strong>Documentation</strong></a></p>
 </div>
 
-## Table of Contents
-- [Quick Start (Docker / OCI)](#quick-start-docker--oci)
-- [Client Integration](#client-integration)
-  - [Cline](#cline)
-  - [Claude Desktop](#claude-desktop)
-  - [Cursor IDE](#cursor-ide)
-  - [Manus AI / Registry Clients](#manus-ai--registry-clients)
-- [Automated AI Setup (`llms-install.md`)](#automated-ai-setup-llms-installmd)
-- [Environment Variables](#environment-variables)
-- [Server-Wide System Instructions](#server-wide-system-instructions)
-- [Available Resources](#available-resources)
-- [Available Tools](#available-tools)
-  - [Task Operations](#task-operations)
-  - [Execution Operations](#execution-operations)
-  - [Schedule Operations](#schedule-operations)
-- [Rich Input Diagnostics & Self-Correction](#rich-input-diagnostics--self-correction)
-- [Local Development & Source Build](#local-development--source-build)
+## Use Figranium with MCP
 
----
+Figranium turns website workflows into reusable Tasks that AI agents can discover, create, and run through MCP. This server is the local STDIO client for connecting an MCP-compatible app to your Figranium instance.
 
-## Quickstart
+> Looking for the hosted OAuth MCP instead? Connect compatible remote MCP clients to `https://mcp.figranium.dev/mcp`.
 
-No Node.js runtime or repository clone is required. The official container image is published on GitHub Container Registry (`ghcr.io`).
+## Quick start
 
-Zero-config npm usage is also supported:
+You need a running Figranium instance and an API key from Figranium settings.
+
+Run the MCP server directly from npm:
 
 ```bash
+FIGRANIUM_API_KEY=YOUR_API_KEY npx -y figranium-mcp
+```
+
+By default, it connects to Figranium at `http://localhost:11345`. To use another instance:
+
+```bash
+FIGRANIUM_BASE_URL=https://your-figranium-instance.example.com \
+FIGRANIUM_API_KEY=YOUR_API_KEY \
 npx -y figranium-mcp
 ```
 
-For local development:
+### MCP client configuration
 
-```bash
-git clone https://github.com/figranium/figranium-mcp
-dcd figranium-mcp
-npm install
-npm run build
-```
-
-```bash
-docker pull ghcr.io/figranium/figranium-mcp:latest
-```
-
-## Environment Variables
-
-The server requires the following environment variables to interact with your Figranium instance:
-
-* `FIGRANIUM_BASE_URL`: The base URL of your Figranium server. Defaults to `http://localhost:11345`.
-* `FIGRANIUM_API_KEY`: The API key generated from Figranium settings to authorize requests. This variable is required for startup.
-
-If `FIGRANIUM_API_KEY` is missing, the server prints a clear setup message and exits gracefully.
-
----
-
-## Client Integration
-
-### Cline
-
-Add the following to your `cline_mcp_settings.json`:
-
-* **macOS**: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
-* **Windows**: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
-* **Linux**: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
-
-```json
-{
-  "mcpServers": {
-    "figranium": {
-      "command": "npx",
-      "args": ["-y", "figranium-mcp"],
-      "env": {
-        "FIGRANIUM_BASE_URL": "http://localhost:11345",
-        "FIGRANIUM_API_KEY": "your_figranium_api_key_here"
-      }
-    }
-  }
-}
-```
-
-Alternatively, if running directly from a cloned source repository:
-
-```json
-{
-  "mcpServers": {
-    "figranium": {
-      "command": "node",
-      "args": ["/path/to/figranium-mcp/dist/index.js"],
-      "env": {
-        "FIGRANIUM_BASE_URL": "http://localhost:11345",
-        "FIGRANIUM_API_KEY": "your_figranium_api_key_here"
-      }
-    }
-  }
-}
-```
-
-> **Automated Setup for Cline**: Give Cline a link or reference to [`llms-install.md`](./llms-install.md) and Cline will perform the setup and configuration automatically.
-
----
-
-### Claude Desktop
-
-Add the container configuration to your `claude_desktop_config.json`:
-
-* **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-* **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "figranium": {
-      "command": "npx",
-      "args": ["-y", "figranium-mcp"],
-      "env": {
-        "FIGRANIUM_BASE_URL": "http://localhost:11345",
-        "FIGRANIUM_API_KEY": "your_figranium_api_key_here"
-      }
-    }
-  }
-}
-```
-
-> **Note for Local Hosts**: If your Figranium instance runs locally on your host machine,
-> use `http://localhost:11345` when running via `npx`.
-
----
-
-### Cursor Integration
-
-Add the following to `~/.cursor/mcp.json`:
+Most local MCP clients accept a configuration shaped like this:
 
 ```json
 {
@@ -157,100 +54,93 @@ Add the following to `~/.cursor/mcp.json`:
 }
 ```
 
-This lets Claude Desktop and Cursor launch the package directly without requiring a local build or a Docker bridge.
+Use that server entry in clients such as Codex, Claude Code, Cursor, GitHub Copilot, Claude Desktop, Cline, and other STDIO MCP clients.
 
----
+If the MCP server itself runs inside Docker while Figranium runs on the host, use `http://host.docker.internal:11345` instead of `http://localhost:11345`.
 
-## Automated AI Setup (`llms-install.md`)
+## What agents can do
 
-AI assistants (including Cline, Cursor, Claude Desktop, and Roo Code) can automatically read [`llms-install.md`](./llms-install.md) to set up and configure the Figranium MCP server without manual intervention.
+Once connected, an agent can work with Figranium without manually calling its API. The MCP server exposes tools for the core Task lifecycle:
 
----
+| Tool | Purpose |
+| --- | --- |
+| `task_list` | Discover existing Tasks |
+| `create_task` | Create a new Task |
+| `task_execute` | Execute a Task with optional variable overrides |
+| `execution_list` | Inspect previous executions |
+| `schedule_list` | Find scheduled Tasks |
+| `schedule_get_all_status` | Inspect scheduler state |
+| `schedule_get_status` | Inspect one Task's schedule |
+| `schedule_set` | Create or update a schedule |
+| `schedule_delete` | Remove a schedule |
+| `schedule_describe` | Validate and preview a schedule |
 
-## Server-Wide System Instructions
+The server also exposes `figranium://schemas/task-v1.json`, allowing clients to inspect the Figranium Task schema directly.
 
-The server initializes with embedded guidelines for LLM agents detailing the task lifecycle:
-1. **Task Creation**: Structuring name, starting URL, execution mode, and stealth mechanisms. Agents should default to `agent` mode, including for scraping tasks. `scrape` mode does not support action blocks and is reserved for exceptional cases requiring extremely fast, action-free scraping; `headful` is intended for visible interactive debugging.
-2. **Step Sequence Construction**: Ordering action steps (`navigate`, `wait_selector`, `click`, `type`, `javascript`) and execution flow. The MCP rejects a first Timed Wait or Navigate To (use task-level `wait` and `url`) and a final Get Content action (use it as intermediate data or use `extractionScript` for final output).
-3. **Selector Strategy**: Preferring robust ARIA, ID, and semantic class selectors with fallback strategies.
-4. **Execution & Variables**: Injecting and overriding runtime context variables.
+Figranium's MCP instructions teach agents how to construct Tasks, choose selectors, use variables, and follow Task sequencing rules. Invalid Task payloads return structured validation diagnostics so an agent can correct its own request.
 
----
+## Local vs hosted MCP
 
-## Available Resources
+The npm package contains the local STDIO MCP server. It does not ship the Figranium MCP landing page or hosted OAuth UI.
 
-### `figranium://schemas/task-v1.json`
-* **MIME Type**: `application/json`
-* **Description**: Exposes the complete JSON Schema specification of a Figranium task. Allows agents to dynamically inspect valid parameters and payload shapes.
+For clients that support remote OAuth MCP, use:
 
----
-
-## Available Tools
-
-### Task Operations
-
-* **`create_task`**: Create a complete, fully-configured Figranium automation task including sequential action steps, state variables, anti-bot stealth mechanisms, and optional scheduling.
-* **`task_list`**: List all task IDs, names, and descriptions registered on the Figranium server.
-* **`task_execute`**: Run a saved task by `taskId` with optional variable overrides.
-
-The task schema supports Figranium v0.18 browser interactions: checked-state actions, drag and drop, page reloads, native select controls, and single/double/right-click modes. It also supports opt-in page translation through `translation: { enabled, targetLanguage }` for Agent and headful Tasks.
-
-### Execution Operations
-
-* **`execution_list`**: Retrieve a summary of past task execution logs and statuses.
-
-### Schedule Operations
-
-* **`schedule_list`**: List all tasks with configured schedules.
-* **`schedule_get_all_status`**: Retrieve overall scheduler state and metadata.
-* **`schedule_get_status`**: Get active schedule details and next run time for a specific `taskId`.
-* **`schedule_set`**: Create or update a cron or frequency schedule on a task.
-* **`schedule_delete`**: Disable and remove a task schedule.
-* **`schedule_describe`**: Validate and preview a schedule configuration without applying it.
-
----
-
-## Rich Input Diagnostics & Self-Correction
-
-If an invalid parameter payload is supplied to `create_task`, the server returns structured Zod diagnostic output (`isError: true`). This allows connected LLMs to analyze schema errors and attempt immediate self-correction.
-
-Example response:
 ```text
-Schema Validation Failed!
-
-Detailed breakdown of validation errors:
- - At Step Index 2 (action step #3), parameter "type" failed validation: Invalid enum value. Expected 'click' | 'type' | 'wait' ..., received 'clikc'
+https://mcp.figranium.dev/mcp
 ```
 
----
+The hosted MCP handles OAuth and connects the client to a publicly reachable Figranium instance. For local clients, `npx -y figranium-mcp` is usually the simpler path and can connect directly to localhost.
 
-## Local Development & Source Build
+## Environment variables
 
-If you wish to modify the source code or run without Docker:
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `FIGRANIUM_API_KEY` | Yes | — | API key generated by your Figranium instance |
+| `FIGRANIUM_BASE_URL` | No | `http://localhost:11345` | Base URL of the Figranium instance |
 
-### Prerequisites
-* Node.js v18+
-* npm v9+
+The server exits with a setup message if `FIGRANIUM_API_KEY` is missing.
 
-### Build & Run
+## Build from source
+
+Requires Node.js 18+ and npm 9+.
 
 ```bash
-# Clone repository
-git clone <a href="https://github.com/figranium/figranium-mcp.git" target="_blank">https://github.com/figranium/figranium-mcp.git</a>
+git clone https://github.com/figranium/figranium-mcp.git
 cd figranium-mcp
-
-# Install dependencies and compile TypeScript
 npm install
 npm run build
+```
 
-# Watch mode for active development
+Run the compiled server:
+
+```bash
+FIGRANIUM_API_KEY=YOUR_API_KEY npm start
+```
+
+For active development:
+
+```bash
 npm run watch
 ```
 
-### Testing with MCP Inspector
-
-Inspect server tools and resources using the official MCP debugging suite:
+Run the test suite:
 
 ```bash
-npx @modelcontextprotocol/inspector npx -y figranium-mcp
+npm test
 ```
+
+### MCP Inspector
+
+You can inspect the published server with the official MCP Inspector:
+
+```bash
+FIGRANIUM_API_KEY=YOUR_API_KEY npx @modelcontextprotocol/inspector npx -y figranium-mcp
+```
+
+## Links
+
+- [Figranium documentation](https://figranium.dev/docs)
+- [Figranium](https://figranium.dev)
+- [npm package](https://www.npmjs.com/package/figranium-mcp)
+- [MCP server source](https://github.com/figranium/figranium-mcp)
+- [Figranium source](https://github.com/figranium/figranium)
