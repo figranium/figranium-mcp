@@ -14,8 +14,7 @@
   },
   "type": "module",
   "files": [
-    "dist",
-    "api-home.html"
+    "dist/index.js"
   ],
   "scripts": {
     "build": "tsc && cp api-home.html dist/index.html",
