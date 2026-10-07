@@ -8,7 +8,7 @@
 
   <p><strong>The official Model Context Protocol (MCP) server for Figranium, built with the official Figranium JavaScript SDK API client.</strong></p>
 
-  <p><a href="https://figranium.dev/docs" target="_blank"><strong>Documentation</strong></a></p>
+  <p><a href="https://mcp.figranium.dev" target="_blank"><strong>View</strong></a></p>
 </div>
 
 ## Use Figranium with MCP
