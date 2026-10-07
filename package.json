@@ -14,10 +14,11 @@
   },
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "api-home.html"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp api-home.html dist/index.html",
     "test": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/test/*.test.js",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build",
