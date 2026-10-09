@@ -1,4 +1,4 @@
-name: One-time MCP v1.5.0 release
+name: One-time MCP v1.5.0 release (validated)
 on:
   push:
     branches: [main]
