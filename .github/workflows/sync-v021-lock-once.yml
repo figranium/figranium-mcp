@@ -1,4 +1,4 @@
-name: Sync v0.21 MCP lockfile once
+name: Sync v0.21 MCP lockfile once (SDK v0.7)
 
 on:
   push:
