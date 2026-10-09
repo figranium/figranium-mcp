@@ -111,7 +111,7 @@ Every task follows a strict execution pipeline that you must carefully construct
 const server = new Server(
   {
     name: "figranium-mcp-server",
-    version: "1.4.0",
+    version: "1.5.0",
     description: "Figranium MCP Server - Facilitates complete task creation, execution, schedule, and automation tracking.\n\n" + SYSTEM_INSTRUCTIONS,
   },
   {
@@ -216,21 +216,10 @@ const CreateTaskSchema = z.object({
     enabled: z.boolean().describe("Enable rendered-page translation for Agent and headful runs. Expected type: boolean. Example: true"),
     targetLanguage: z.string().describe("translate.js target language name. Expected type: string. Example: 'spanish'")
   }).optional().describe("Optional page translation. It is disabled by default and is not available in Scrape mode."),
+  cookieStateId: z.string().optional().describe("Reusable cookie state ID attached to this Task in Figranium v0.21. Must refer to a preexisting state."),
   downloadCabinetId: z.string().optional().describe("Cabinet used for intercepted downloads; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"),
   schedule: TaskScheduleSchema.optional().describe("Task automatic execution schedule. Expected type: object.")
 }).describe("Reflects the full schema of a Figranium task creation payload.");
-
-const BrowserOpenSchema = z.object({
-  url: z.string().optional().describe("Initial URL to navigate to when the browser opens. Expected type: string. Example: 'https://example.com'"),
-  mode: z.enum(['headful', 'scrape', 'agent']).optional().default('headful').describe("Informational mode of browser. Expected type: string enum. Example: 'headful'"),
-  devTools: z.boolean().optional().default(false).describe("Whether to open DevTools automatically. Expected type: boolean. Example: false")
-}).describe("Configuration for launching or reattaching a managed browser session.");
-
-const InspectorHighlightSchema = z.object({
-  sessionId: z.string().optional().describe("Active session ID. Expected type: string. Example: 'sess_123'"),
-  url: z.string().optional().describe("Optional URL to navigate to. Expected type: string. Example: 'https://example.com'"),
-  targetHint: z.string().optional().describe("Optional target hint (e.g., text, selector) to highlight elements. Expected type: string. Example: 'login button'")
-}).describe("Configuration for highlighting or inspecting elements on the active session.");
 
 const TaskDeleteSchema = z.object({
   taskId: z.string().describe("The unique ID of the task to delete. Expected type: string. Example: 'task_101'")
@@ -564,44 +553,12 @@ const TASK_JSON_SCHEMA = {
   required: ["name", "url", "mode"]
 };
 
-const BROWSER_OPEN_JSON_SCHEMA = {
-  type: "object",
-  properties: {
-    url: {
-      type: "string",
-      description: "Initial URL to navigate to when the browser opens."
-    },
-    mode: {
-      type: "string",
-      enum: ["headful", "scrape", "agent"],
-      default: "headful",
-      description: "Informational mode of browser. Note: only headful is supported via the VNC stack."
-    },
-    devTools: {
-      type: "boolean",
-      default: false,
-      description: "Open DevTools automatically."
-    }
-  }
-};
 
-const INSPECTOR_HIGHLIGHT_JSON_SCHEMA = {
-  type: "object",
-  properties: {
-    sessionId: {
-      type: "string",
-      description: "The ID of the browser session to target."
-    },
-    url: {
-      type: "string",
-      description: "Optional URL to navigate to."
-    },
-    targetHint: {
-      type: "string",
-      description: "Optional text or hint to find and highlight target elements."
-    }
-  }
-};
+
+
+
+const TaskDeleteSchema = z.object({ taskId: z.string().min(1) });
+const TaskUpdateSchema = z.object({ taskId: z.string().min(1) }).passthrough().refine((input) => Object.keys(input).some((key) => key !== "taskId"), { message: "Provide at least one field to update" });
 
 const TASK_DELETE_JSON_SCHEMA = {
   type: "object",
@@ -911,18 +868,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {},
         },
-      },
-      {
-        name: "browser_open",
-        annotations: { title: "Open Browser", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        description: "Launch or reattach a managed headful/interactive browser session.",
-        inputSchema: BROWSER_OPEN_JSON_SCHEMA,
-      },
-      {
-        name: "inspector_highlight",
-        annotations: { title: "Highlight Browser Target", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        description: "Activate inspect/highlight mode on an active browser session with optional selector hints.",
-        inputSchema: INSPECTOR_HIGHLIGHT_JSON_SCHEMA,
       },
       {
         name: "task_execute",
@@ -1244,60 +1189,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { taskId } = parseResult.data;
 
         const response = await figranium.tasks.delete(taskId);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(response, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "browser_open": {
-        const parseResult = BrowserOpenSchema.safeParse(args || {});
-        if (!parseResult.success) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: formatZodError(parseResult.error),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        const payload = parseResult.data;
-
-        const response = await figranium.browser.open(payload);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(response, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "inspector_highlight": {
-        const parseResult = InspectorHighlightSchema.safeParse(args || {});
-        if (!parseResult.success) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: formatZodError(parseResult.error),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        const payload = parseResult.data;
-
-        const response = await figranium.browser.highlight(payload);
         return {
           content: [
             {
