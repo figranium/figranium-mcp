@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
+    paths:
+      - '.github/workflows/npm-publish.yml'
   workflow_dispatch: {}
 
 permissions:
@@ -33,6 +37,10 @@ jobs:
       - name: Verify tag matches package version
         if: startsWith(github.ref, 'refs/tags/')
         run: test "${GITHUB_REF_NAME}" = "v$(node -p "require('./package.json').version")"
+
+      - name: Validate one-time hotfix release
+        if: github.ref == 'refs/heads/main'
+        run: test "$(node -p "require('./package.json').version")" = '1.5.1'
 
       - name: Install dependencies
         run: npm ci
