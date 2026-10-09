@@ -1,0 +1,21 @@
+name: One-time MCP v1.5.1 GitHub release
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-v1.5.1-release.yml'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create v1.5.1 release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.5.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "v1.5.1 already exists"
+            exit 0
+          fi
+          gh release create v1.5.1 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "v1.5.1" --notes "## Fixed\n\n- Include all compiled MCP server modules in the published npm package, not just dist/index.js.\n- Fix missing dist/mcp-server.js at startup, restoring compatibility with Manus and other local STDIO MCP integrations.\n- No API or configuration changes are required.\n\nPublished npm package: figranium-mcp@1.5.1."
