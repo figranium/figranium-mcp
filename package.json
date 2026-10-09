@@ -26,7 +26,7 @@
     "postbuild": "node -e \"require('fs').chmodSync('./dist/index.js', 0o755)\""
   },
   "dependencies": {
-    "@figranium/sdk": "^0.6.0",
+    "@figranium/sdk": "^0.7.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^4.0.0"
   },
