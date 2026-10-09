@@ -2,6 +2,8 @@ name: Publish to npm
 
 on:
   push:
+    branches: [main]
+    paths: ['.github/workflows/npm-publish.yml']
     tags:
       - 'v*'
   workflow_dispatch: {}
