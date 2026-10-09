@@ -4,7 +4,8 @@
 
 - Added optional cookieStateId to Task creation and update schemas for reusable v0.21 browser states.
 - Maintained compatibility with the published JavaScript SDK v0.5.x until newer SDK packages are available.
-- Retained scoped API key permissions: the MCP server does not expose session-only administrative endpoints.
+- Removed interactive browser session and inspector tools; MCP remains focused on task execution and automation orchestration.
+- Does not expose authentication, credentials, settings, API-key administration, or cookie-state administration endpoints.
 
 
 ## [1.4.0] - 2026-10-03
