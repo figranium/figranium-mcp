@@ -221,6 +221,24 @@ const CreateTaskSchema = z.object({
   schedule: TaskScheduleSchema.optional().describe("Task automatic execution schedule. Expected type: object.")
 }).describe("Reflects the full schema of a Figranium task creation payload.");
 
+const TaskDeleteSchema = z.object({
+  taskId: z.string().describe("The unique ID of the task to delete. Expected type: string. Example: 'task_101'")
+}).describe("Configuration for deleting an existing automation task.");
+
+const TaskUpdateSchema = CreateTaskSchema.partial().extend({
+  taskId: z.string().min(1).describe("The ID of the existing task to modify. Obtain it from task_list; this is the only required field. Expected type: non-empty string. Example: 'task_101'")
+}).superRefine((value, context) => {
+  if (Object.keys(value).some((key) => key !== "taskId")) return;
+  context.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: [],
+    message: "Provide taskId and at least one field to update; an ID-only request makes no change.",
+  });
+}).describe("A partial update for an existing Figranium task. taskId identifies the stored task; supply one or more mutable task fields to change.");
+
+/**
+ * Rich formatted JSON Schema of a Figranium Task
+ */
 const TASK_JSON_SCHEMA = {
   type: "object",
   description: "Exhaustive task creation structure for Figranium automation tasks.",
