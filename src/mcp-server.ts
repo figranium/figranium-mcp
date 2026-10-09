@@ -535,44 +535,9 @@ const TASK_JSON_SCHEMA = {
   required: ["name", "url", "mode"]
 };
 
-const BROWSER_OPEN_JSON_SCHEMA = {
-  type: "object",
-  properties: {
-    url: {
-      type: "string",
-      description: "Initial URL to navigate to when the browser opens."
-    },
-    mode: {
-      type: "string",
-      enum: ["headful", "scrape", "agent"],
-      default: "headful",
-      description: "Informational mode of browser. Note: only headful is supported via the VNC stack."
-    },
-    devTools: {
-      type: "boolean",
-      default: false,
-      description: "Open DevTools automatically."
-    }
-  }
-};
 
-const INSPECTOR_HIGHLIGHT_JSON_SCHEMA = {
-  type: "object",
-  properties: {
-    sessionId: {
-      type: "string",
-      description: "The ID of the browser session to target."
-    },
-    url: {
-      type: "string",
-      description: "Optional URL to navigate to."
-    },
-    targetHint: {
-      type: "string",
-      description: "Optional text or hint to find and highlight target elements."
-    }
-  }
-};
+
+
 
 const TASK_DELETE_JSON_SCHEMA = {
   type: "object",
