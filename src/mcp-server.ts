@@ -111,7 +111,7 @@ Every task follows a strict execution pipeline that you must carefully construct
 const server = new Server(
   {
     name: "figranium-mcp-server",
-    version: "1.4.0",
+    version: "1.5.0",
     description: "Figranium MCP Server - Facilitates complete task creation, execution, schedule, and automation tracking.\n\n" + SYSTEM_INSTRUCTIONS,
   },
   {
@@ -216,6 +216,7 @@ const CreateTaskSchema = z.object({
     enabled: z.boolean().describe("Enable rendered-page translation for Agent and headful runs. Expected type: boolean. Example: true"),
     targetLanguage: z.string().describe("translate.js target language name. Expected type: string. Example: 'spanish'")
   }).optional().describe("Optional page translation. It is disabled by default and is not available in Scrape mode."),
+  cookieStateId: z.string().optional().describe("Reusable cookie state ID attached to this Task in Figranium v0.21. Must refer to a preexisting state."),
   downloadCabinetId: z.string().optional().describe("Cabinet used for intercepted downloads; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"),
   schedule: TaskScheduleSchema.optional().describe("Task automatic execution schedule. Expected type: object.")
 }).describe("Reflects the full schema of a Figranium task creation payload.");
