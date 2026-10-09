@@ -557,8 +557,6 @@ const TASK_JSON_SCHEMA = {
 
 
 
-const TaskDeleteSchema = z.object({ taskId: z.string().min(1) });
-const TaskUpdateSchema = z.object({ taskId: z.string().min(1) }).passthrough().refine((input) => Object.keys(input).some((key) => key !== "taskId"), { message: "Provide at least one field to update" });
 
 const TASK_DELETE_JSON_SCHEMA = {
   type: "object",
