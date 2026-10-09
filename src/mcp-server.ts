@@ -221,36 +221,6 @@ const CreateTaskSchema = z.object({
   schedule: TaskScheduleSchema.optional().describe("Task automatic execution schedule. Expected type: object.")
 }).describe("Reflects the full schema of a Figranium task creation payload.");
 
-const BrowserOpenSchema = z.object({
-  url: z.string().optional().describe("Initial URL to navigate to when the browser opens. Expected type: string. Example: 'https://example.com'"),
-  mode: z.enum(['headful', 'scrape', 'agent']).optional().default('headful').describe("Informational mode of browser. Expected type: string enum. Example: 'headful'"),
-  devTools: z.boolean().optional().default(false).describe("Whether to open DevTools automatically. Expected type: boolean. Example: false")
-}).describe("Configuration for launching or reattaching a managed browser session.");
-
-const InspectorHighlightSchema = z.object({
-  sessionId: z.string().optional().describe("Active session ID. Expected type: string. Example: 'sess_123'"),
-  url: z.string().optional().describe("Optional URL to navigate to. Expected type: string. Example: 'https://example.com'"),
-  targetHint: z.string().optional().describe("Optional target hint (e.g., text, selector) to highlight elements. Expected type: string. Example: 'login button'")
-}).describe("Configuration for highlighting or inspecting elements on the active session.");
-
-const TaskDeleteSchema = z.object({
-  taskId: z.string().describe("The unique ID of the task to delete. Expected type: string. Example: 'task_101'")
-}).describe("Configuration for deleting an existing automation task.");
-
-const TaskUpdateSchema = CreateTaskSchema.partial().extend({
-  taskId: z.string().min(1).describe("The ID of the existing task to modify. Obtain it from task_list; this is the only required field. Expected type: non-empty string. Example: 'task_101'")
-}).superRefine((value, context) => {
-  if (Object.keys(value).some((key) => key !== "taskId")) return;
-  context.addIssue({
-    code: z.ZodIssueCode.custom,
-    path: [],
-    message: "Provide taskId and at least one field to update; an ID-only request makes no change.",
-  });
-}).describe("A partial update for an existing Figranium task. taskId identifies the stored task; supply one or more mutable task fields to change.");
-
-/**
- * Rich formatted JSON Schema of a Figranium Task
- */
 const TASK_JSON_SCHEMA = {
   type: "object",
   description: "Exhaustive task creation structure for Figranium automation tasks.",
@@ -914,18 +884,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "browser_open",
-        annotations: { title: "Open Browser", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        description: "Launch or reattach a managed headful/interactive browser session.",
-        inputSchema: BROWSER_OPEN_JSON_SCHEMA,
-      },
-      {
-        name: "inspector_highlight",
-        annotations: { title: "Highlight Browser Target", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        description: "Activate inspect/highlight mode on an active browser session with optional selector hints.",
-        inputSchema: INSPECTOR_HIGHLIGHT_JSON_SCHEMA,
-      },
-      {
         name: "task_execute",
         annotations: { title: "Execute Task", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
         description: "Execute a saved automation task by ID and return its real run result. This is also useful for validating newly created or updated tasks against actual browser behavior and output.",
@@ -1245,60 +1203,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { taskId } = parseResult.data;
 
         const response = await figranium.tasks.delete(taskId);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(response, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "browser_open": {
-        const parseResult = BrowserOpenSchema.safeParse(args || {});
-        if (!parseResult.success) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: formatZodError(parseResult.error),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        const payload = parseResult.data;
-
-        const response = await figranium.browser.open(payload);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(response, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "inspector_highlight": {
-        const parseResult = InspectorHighlightSchema.safeParse(args || {});
-        if (!parseResult.success) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: formatZodError(parseResult.error),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        const payload = parseResult.data;
-
-        const response = await figranium.browser.highlight(payload);
         return {
           content: [
             {
