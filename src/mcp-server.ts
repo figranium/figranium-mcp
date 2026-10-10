@@ -14,8 +14,6 @@ import {
 import {
   Figranium,
   FigraniumError,
-  type Schedule,
-  type Task,
 } from "@figranium/sdk";
 import { z } from "zod";
 import { getWorkflowBoundaryIssues } from "./workflow-validation.js";
@@ -1131,7 +1129,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const taskPayload = parseResult.data;
 
-        const response = await figranium.tasks.save(taskPayload as Task);
+        const response = await figranium.tasks.save(taskPayload as Parameters<typeof figranium.tasks.save>[0]);
         return {
           content: [
             {
@@ -1158,7 +1156,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const { taskId, ...updates } = parseResult.data;
 
-        const response = await figranium.tasks.update(taskId, updates as Partial<Task>);
+        const response = await figranium.tasks.update(taskId, updates as Parameters<typeof figranium.tasks.update>[1]);
         return {
           content: [
             {
@@ -1361,7 +1359,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        const response = await figranium.schedules.set(taskId, body as unknown as Schedule);
+        const response = await figranium.schedules.set(taskId, body as Parameters<typeof figranium.schedules.set>[1]);
         return {
           content: [
             {
@@ -1422,7 +1420,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        const response = await figranium.schedules.describe(taskId, body as unknown as Schedule);
+        const response = await figranium.schedules.describe(taskId, body as Parameters<typeof figranium.schedules.describe>[1]);
         return {
           content: [
             {
