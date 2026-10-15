@@ -209,12 +209,12 @@ const CreateTaskSchema = z.object({
   includeHtml: z.boolean().optional().default(false).describe("Whether to include the raw page HTML in the execution response. Expected type: boolean. Example: false"),
   includeShadowDom: z.boolean().optional().default(true).describe("Whether to parse and resolve target elements residing in Shadow DOMs. Expected type: boolean. Example: true"),
   disableRecording: z.boolean().optional().default(false).describe("Disable video/VNC recording of this task to save storage. Expected type: boolean. Example: true"),
-  statelessExecution: z.boolean().optional().default(false).describe("If set to true, clear browser cookies and session states between runs. Expected type: boolean. Example: false"),
+  statelessExecution: z.boolean().optional().describe("Deprecated legacy compatibility flag. Use cookieStateId: null for a fresh browser state."),
   translation: z.object({
     enabled: z.boolean().describe("Enable rendered-page translation for Agent and headful runs. Expected type: boolean. Example: true"),
     targetLanguage: z.string().describe("translate.js target language name. Expected type: string. Example: 'spanish'")
   }).optional().describe("Optional page translation. It is disabled by default and is not available in Scrape mode."),
-  cookieStateId: z.string().optional().describe("Reusable cookie state ID attached to this Task in Figranium v0.21. Must refer to a preexisting state."),
+  cookieStateId: z.string().nullable().optional().describe("Existing named cookie state ID; null starts fresh, omitted uses the instance default (Figranium v0.21+)."),
   downloadCabinetId: z.string().optional().describe("Cabinet used for intercepted downloads; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"),
   schedule: TaskScheduleSchema.optional().describe("Task automatic execution schedule. Expected type: object.")
 }).describe("Reflects the full schema of a Figranium task creation payload.");
@@ -495,7 +495,7 @@ const TASK_JSON_SCHEMA = {
     statelessExecution: {
       type: "boolean",
       default: false,
-      description: "If set to true, clear browser cookies and session states between runs. Expected type: boolean. Example: false"
+      description: "Deprecated legacy flag. Prefer cookieStateId: null for a fresh browser state."
     },
     translation: {
       type: "object",
@@ -505,6 +505,10 @@ const TASK_JSON_SCHEMA = {
         targetLanguage: { type: "string", description: "translate.js target language name. Expected type: string. Example: 'spanish'" }
       },
       required: ["enabled", "targetLanguage"]
+    },
+    cookieStateId: {
+      type: ["string", "null"],
+      description: "Existing named cookie state ID; null starts fresh, omitted uses the instance default (Figranium v0.21+)."
     },
     downloadCabinetId: {
       type: "string",
@@ -673,7 +677,7 @@ Fallback: If an element might be missing or slow to load, wrap the interaction i
 ### 5. Edge Cases & Retry Logic
 - Timeouts: Wait-selectors have a default timeout. Ensure critical steps use 'wait_selector' first to avoid clicking non-existent elements.
 - Stealth: Turning on options like 'naturalTyping', 'cursorGlide', and 'allowTypos' simulates authentic human speed and rhythm to prevent anti-bot blocking on protected sites.
-- Statelessness: Enable 'statelessExecution' to ensure execution is completely fresh without persistent browser storage/cookies.
+- Browser state: Set 'cookieStateId' to a preexisting named state ID to reuse cookies, to null for a fresh state, or omit it for the instance default. 'statelessExecution' is a deprecated legacy flag.
 
 ### 6. Complex Real-World Multi-Step JSON Example:
 \`\`\`json
