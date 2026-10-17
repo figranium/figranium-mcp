@@ -1,23 +1,43 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.figranium/figranium-mcp",
-  "title": "Figranium MCP",
-  "description": "MCP server for creating, running, inspecting, and scheduling Figranium browser automations.",
-  "version": "1.4.0",
+  "title": "Figranium",
+  "description": "Visual browser automation MCP server: turn browser workflows into reusable Tasks for AI agents.",
+  "websiteUrl": "https://figranium.dev",
   "repository": {
-    "source": "github",
-    "url": "https://github.com/figranium/figranium-mcp.git"
+    "url": "https://github.com/figranium/figranium-mcp",
+    "source": "github"
   },
+  "version": "1.5.2",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "figranium-mcp",
-      "version": "1.4.0",
+      "version": "1.5.2",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
-      }
+      },
+      "environmentVariables": [
+        {
+          "name": "FIGRANIUM_API_KEY",
+          "description": "API key for the Figranium instance",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "FIGRANIUM_BASE_URL",
+          "description": "Base URL of the Figranium instance",
+          "default": "http://localhost:11345"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.figranium.dev/mcp"
     }
   ]
 }
