@@ -1,26 +1,37 @@
 name: Publish MCP Registry
-# Publish the current registry manifest.
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    name: Publish registry metadata
     runs-on: ubuntu-latest
+    environment: mcp-registry-publish
+
     steps:
       - uses: actions/checkout@v7
+
       - name: Install MCP publisher
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          curl --fail --location --silent --show-error \
+            "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
+            | tar xz mcp-publisher
+
+      - name: Validate registry manifest
+        run: ./mcp-publisher validate
+
       - name: Authenticate to MCP Registry
-        run: ./mcp-publisher login github-oidc
-      - name: Publish to MCP Registry
+        env:
+          MCP_GITHUB_TOKEN: ${{ secrets.MCP_GITHUB_TOKEN }}
+        run: ./mcp-publisher login github --token "$MCP_GITHUB_TOKEN"
+
+      - name: Publish registry metadata
         run: ./mcp-publisher publish
