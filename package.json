@@ -3,10 +3,23 @@
   "version": "1.5.2",
   "mcpName": "io.github.figranium/figranium-mcp",
   "description": "MCP server for Figranium, wrapping task execution, scheduling, and automation orchestration.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "browser-automation",
+    "playwright",
+    "ai-agents",
+    "visual-automation",
+    "figranium"
+  ],
   "license": "Apache-2.0",
+  "homepage": "https://figranium.dev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/figranium/figranium-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/figranium/figranium-mcp/issues"
   },
   "main": "dist/index.js",
   "bin": {
