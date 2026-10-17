@@ -19,6 +19,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set manifest version from package
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          jq --arg version "$VERSION"             '.version = $version | .packages |= map(if .registryType == "npm" and .identifier == "figranium-mcp" then .version = $version else . end)'             server.json > server.tmp
+          mv server.tmp server.json
+
       - name: Install MCP publisher
         run: |
           curl --fail --location --silent --show-error \
