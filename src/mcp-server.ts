@@ -109,7 +109,7 @@ Every task follows a strict execution pipeline that you must carefully construct
 const server = new Server(
   {
     name: "figranium-mcp-server",
-    version: "1.5.0",
+    version: "1.6.0",
     description: "Figranium MCP Server - Facilitates complete task creation, execution, schedule, and automation tracking.\n\n" + SYSTEM_INSTRUCTIONS,
   },
   {
@@ -597,7 +597,7 @@ const TASK_DELETE_JSON_SCHEMA = {
 
 const TASK_UPDATE_JSON_SCHEMA = {
   type: "object",
-  description: "Partially update a saved Figranium automation task. First use task_list to obtain taskId, then send taskId plus at least one field to change. Omitted fields are left unchanged. This operation persists the supplied values and is idempotent when repeated with the same payload. When supplying compound fields such as actions, variables, stealth, translation, or schedule, provide the complete intended value for that field. Use '{$variable_name}' (not '{{variable_name}}' or '${variable_name}') for variable references in URLs and action values. After changing browser behavior, selectors, actions, or extractionScript, use task_execute to validate the real result. Do not use this tool to delete a task; use task_delete instead.",
+  description: "Partially update a saved Figranium automation task. First use task_list to obtain taskId, then send taskId plus at least one field to change. Omitted fields are left unchanged. This operation persists the supplied values and is idempotent when repeated with the same payload. When changing actions or variables, provide BOTH complete actions and variables together; requests containing only one are rejected to avoid clearing the saved workflow. Other compound fields must contain their complete intended value. Use '{$variable_name}' (not '{{variable_name}}' or '${variable_name}') for variable references in URLs and action values. After changing browser behavior, selectors, actions, or extractionScript, use task_execute to validate the real result. Do not use this tool to delete a task; use task_delete instead.",
   properties: {
     taskId: {
       type: "string",
@@ -639,7 +639,7 @@ Use this after \`task_list\` identifies the task to modify—for example, to cor
 - Repeating the same request is safe and produces the same stored configuration.
 
 ### Important update behavior
-- For compound fields—\`actions\`, \`variables\`, \`stealth\`, \`translation\`, and \`schedule\`—send the complete value you want stored for that field, rather than only a nested fragment.
+- For compound fields—\`actions\`, \`variables\`, \`stealth\`, \`translation\`, and \`schedule\`—send complete values, not nested fragments. When changing either \`actions\` or \`variables\`, ALWAYS supply BOTH complete fields together. An incomplete pair is rejected before saving to prevent accidentally clearing the existing workflow.
 - \`actions\` are an ordered replacement sequence. Use \`agent\` or \`headful\` mode for actions; \`scrape\` mode does not support them. Close every \`if\`, \`while\`, \`repeat\`, or \`foreach\` block with an \`end\` action.
 - A replacement sequence cannot start with Timed Wait or Navigate To: use task-level \`wait\` or \`url\` to establish the starting state. It also cannot end with Get Content: feed that value into a later action, or use \`extractionScript\` for final output.
 - Use \`{$variable_name}\` for task-variable references in URLs, headers, bodies, and action values. Do not use \`{{variable_name}}\` or \`\${variable_name}\`.
@@ -1184,6 +1184,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const { taskId, ...updates } = parseResult.data;
+
+        // The API replaces compound task configuration rather than deep-merging it.
+        // The API-key SDK only exposes task summaries, so MCP cannot safely recover
+        // omitted actions/variables. Reject ambiguous partial writes before PATCH.
+        if (("actions" in updates) !== ("variables" in updates)) {
+          return {
+            content: [{
+              type: "text",
+              text: "Updating actions or variables requires BOTH complete fields in the same request. The Figranium API may replace omitted compound fields and erase saved actions. Supply the full existing action sequence and the full intended variables object together; no changes were saved.",
+            }],
+            isError: true,
+          };
+        }
 
         const response = await figranium.tasks.update(taskId, updates as Parameters<typeof figranium.tasks.update>[1]);
         return {
