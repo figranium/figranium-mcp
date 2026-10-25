@@ -187,8 +187,18 @@ const TaskScheduleSchema = z.object({
   hour: z.number().optional().describe("Hour of the day to execute (0-23). Used for daily/weekly/monthly schedules. Expected type: number. Example: 9"),
   minute: z.number().optional().describe("Minute of the hour to execute (0-59). Expected type: number. Example: 15"),
   daysOfWeek: z.array(z.number()).optional().describe("Days of the week (0=Sunday, 1=Monday, ..., 6=Saturday). Expected type: number array. Example: [1, 3, 5]"),
-  dayOfMonth: z.number().optional().describe("Day of the month (1-31). Used for monthly schedules. Expected type: number. Example: 1")
+  dayOfMonth: z.number().optional().describe("Day of the month (1-31). Used for monthly schedules. Expected type: number. Example: 1"),
+  cron: z.string().optional().describe("Custom cron expression supported by Figranium schedules; use instead of frequency when applicable.")
 }).describe("Optional schedule settings to run this task automatically.");
+
+const TaskOutputSchema = z.object({
+  provider: z.literal("baserow"),
+  credentialId: z.string().min(1).describe("ID of a Baserow credential already configured in Figranium."),
+  databaseId: z.string().optional().describe("Baserow database ID for provisioning the destination table."),
+  tableId: z.string().min(1).describe("Destination Baserow table ID."),
+  dedicated: z.boolean().optional().describe("Whether the output uses a dedicated Baserow table."),
+  onError: z.enum(["ignore", "fail"]).optional().describe("Behavior if writing the task result fails.")
+}).describe("Baserow output destination for a Task. Credentials must be configured separately in the Figranium workspace.");
 
 const CreateTaskSchema = z.object({
   name: z.string().describe("Descriptive name of the automation task. Expected type: string. Example: 'Lead Extractor'"),
@@ -216,6 +226,7 @@ const CreateTaskSchema = z.object({
   }).optional().describe("Optional page translation. It is disabled by default and is not available in Scrape mode."),
   cookieStateId: z.string().nullable().optional().describe("Existing named cookie state ID; null starts fresh, omitted uses the instance default (Figranium v0.21+)."),
   downloadCabinetId: z.string().optional().describe("Cabinet used for intercepted downloads; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"),
+  output: TaskOutputSchema.optional().describe("Optional Baserow destination for Task results; requires an existing workspace credential."),
   schedule: TaskScheduleSchema.optional().describe("Task automatic execution schedule. Expected type: object.")
 }).describe("Reflects the full schema of a Figranium task creation payload.");
 
@@ -514,6 +525,19 @@ const TASK_JSON_SCHEMA = {
       type: "string",
       description: "Cabinet used for intercepted downloads; omitted uses the default Cabinet. Expected type: string. Example: 'cab_basic'"
     },
+    output: {
+      type: "object",
+      description: "Optional Baserow destination for Task results. Use a credential already configured in the Figranium workspace; this does not administer credentials.",
+      properties: {
+        provider: { type: "string", const: "baserow" },
+        credentialId: { type: "string", minLength: 1 },
+        databaseId: { type: "string" },
+        tableId: { type: "string", minLength: 1 },
+        dedicated: { type: "boolean" },
+        onError: { type: "string", enum: ["ignore", "fail"] }
+      },
+      required: ["provider", "credentialId", "tableId"]
+    },
     schedule: {
       type: "object",
       description: "Task automatic execution schedule. Expected type: object.",
@@ -547,7 +571,8 @@ const TASK_JSON_SCHEMA = {
         dayOfMonth: {
           type: "number",
           description: "Day of the month (1-31). Used for monthly schedules. Expected type: number. Example: 1"
-        }
+        },
+        cron: { type: "string", description: "Custom cron expression; use instead of frequency when applicable." }
       },
       required: ["enabled"]
     }
