@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0] - 2026-10-25
+
+### Fixed
+
+- Reject partial action/variable updates that could silently erase stored workflows. Updates to either field must include both complete values.
+- Clarify MCP update semantics and compound-field replacement behavior.
+
 ## [1.5.0] - 2026-10-09
 
 - Added optional cookieStateId to Task creation and update schemas for reusable v0.21 browser states.
