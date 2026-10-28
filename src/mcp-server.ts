@@ -149,7 +149,7 @@ const ActionSchema = z.object({
   disabled: z.boolean().optional().default(false).describe("Skip execution of this step if set to true. Expected type: boolean. Example: false"),
   varName: z.string().optional().describe("Runtime variable name used by actions such as Set Variable, merge, or foreach. Set Variable may create or update this runtime variable. Do not use varName as the schema for final task outputs; use extractionScript for final extraction."),
   conditionVar: z.string().optional().describe("Variable to evaluate for conditional steps (if, while). Expected type: string. Example: 'isLoggedIn'"),
-  conditionVarType: z.enum(['string', 'number', 'boolean']).optional().describe("The type of the condition variable to evaluate. Expected type: string enum. Example: 'boolean'"),
+  conditionVarType: z.enum(['string', 'number', 'boolean', 'selector']).optional().describe("The type of the condition variable to evaluate. Expected type: string enum. Example: 'boolean'"),
   conditionOp: z.string().optional().describe("Operator for conditional comparison (e.g., '==', '!=', 'contains', '>', '<'). Expected type: string. Example: '=='"),
   conditionValue: z.string().optional().describe("Value to compare the condition variable against. Expected type: string. Example: 'true'"),
   typeMode: z.enum(['append', 'replace']).optional().default('replace').describe("Whether to append text or clear/replace existing text during 'type' actions. Expected type: string enum. Example: 'replace'"),
@@ -175,7 +175,7 @@ const WorkflowActionsSchema = z.array(ActionSchema).superRefine((actions, contex
 });
 
 const VariableSchema = z.object({
-  type: z.enum(['string', 'number', 'boolean']).describe("The data type of the stored variable. Expected type: string enum. Example: 'string'"),
+  type: z.enum(['string', 'number', 'boolean', 'selector']).describe("The data type of the stored variable. Expected type: string enum. Example: 'string'"),
   value: z.any().describe("The initial value of the variable. Expected type: any. Example: 'John Doe'"),
   autoCreated: z.boolean().optional().default(false).describe("Indicates if the variable was automatically declared by the system. Expected type: boolean. Example: false")
 }).describe("Configures task input variables and caller-overridable values. Do not declare output-only fields here; use Set Variable for mid-task runtime state and extractionScript for final outputs.");
@@ -393,7 +393,7 @@ const TASK_JSON_SCHEMA = {
           },
           conditionVarType: {
             type: "string",
-            enum: ["string", "number", "boolean"],
+            enum: ["string", "number", "boolean", "selector"],
             description: "The type of the condition variable to evaluate. Expected type: string enum. Example: 'boolean'"
           },
           conditionOp: {
@@ -463,7 +463,7 @@ const TASK_JSON_SCHEMA = {
         properties: {
           type: {
             type: "string",
-            enum: ["string", "number", "boolean"],
+            enum: ["string", "number", "boolean", "selector"],
             description: "The data type of the stored variable. Expected type: string enum. Example: 'string'"
           },
           value: {
