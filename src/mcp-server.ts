@@ -134,6 +134,11 @@ const StealthConfigSchema = z.object({
   randomizeClicks: z.boolean().default(false).describe("Vary the precise coordinates of clicks within target elements. Expected type: boolean. Example: true")
 }).describe("Configures realistic stealth, anti-bot, and human behavior simulation on the browser instance.");
 
+const ConditionOperators = [
+  'equals', 'not_equals', 'contains', 'starts_with', 'ends_with', 'matches',
+  'gt', 'gte', 'lt', 'lte', 'is_true', 'is_false', 'exists', 'not_exists',
+] as const;
+
 const ActionSchema = z.object({
   id: z.string().optional().describe("Unique identifier for this action step. Generated automatically if omitted. Expected type: string. Example: 'act_101'"),
   type: z.enum([
@@ -150,7 +155,7 @@ const ActionSchema = z.object({
   varName: z.string().optional().describe("Runtime variable name used by actions such as Set Variable, merge, or foreach. Set Variable may create or update this runtime variable. Do not use varName as the schema for final task outputs; use extractionScript for final extraction."),
   conditionVar: z.string().optional().describe("Variable to evaluate for conditional steps (if, while). Expected type: string. Example: 'isLoggedIn'"),
   conditionVarType: z.enum(['string', 'number', 'boolean', 'selector']).optional().describe("The type of the condition variable to evaluate. Expected type: string enum. Example: 'boolean'"),
-  conditionOp: z.string().optional().describe("Operator for conditional comparison (e.g., '==', '!=', 'contains', '>', '<'). Expected type: string. Example: '=='"),
+  conditionOp: z.enum(ConditionOperators).optional().describe("Structured condition operator. String: equals, not_equals, contains, starts_with, ends_with, matches; number: equals, not_equals, gt, gte, lt, lte; boolean: is_true, is_false; selector: exists, not_exists (checks action.selector). Example: 'equals'"),
   conditionValue: z.string().optional().describe("Value to compare the condition variable against. Expected type: string. Example: 'true'"),
   typeMode: z.enum(['append', 'replace']).optional().default('replace').describe("Whether to append text or clear/replace existing text during 'type' actions. Expected type: string enum. Example: 'replace'"),
   clickType: z.enum(['single', 'double', 'right']).optional().default('single').describe("Click interaction mode for 'click': single, double, or right click. Expected type: string enum. Example: 'double'"),
@@ -398,7 +403,8 @@ const TASK_JSON_SCHEMA = {
           },
           conditionOp: {
             type: "string",
-            description: "Operator for conditional comparison (e.g., '==', '!=', 'contains', '>', '<'). Expected type: string. Example: '=='"
+            enum: [...ConditionOperators],
+            description: "Structured condition operator. String: equals, not_equals, contains, starts_with, ends_with, matches; number: equals, not_equals, gt, gte, lt, lte; boolean: is_true, is_false; selector: exists, not_exists (checks action.selector). Example: 'equals'"
           },
           conditionValue: {
             type: "string",

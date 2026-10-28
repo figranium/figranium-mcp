@@ -145,10 +145,9 @@ Structured example:
 {
   "id": "act_if",
   "type": "if",
-  "conditionVarType": "string",
-  "conditionVar": ".login",
-  "conditionOp": "exists",
-  "conditionValue": ""
+  "conditionVarType": "selector",
+  "selector": ".login",
+  "conditionOp": "exists"
 }
 ```
 
@@ -175,6 +174,9 @@ Collect items from selector or variable and iterate.
 
 `boolean` ops:
 - `is_true`, `is_false`
+
+`selector` ops:
+- `exists`, `not_exists` — checks `action.selector` against the page's DOM; `conditionVar` is not used for selector conditions.
 
 ## 8) JS condition helpers (value expression)
 If you use `value` as JS expression, these helpers exist:
