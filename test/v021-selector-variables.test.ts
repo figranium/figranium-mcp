@@ -19,6 +19,10 @@ test("v0.21 selector variables and conditions are exposed and preserved by creat
   const client = new Client({ name: "selector-schema-test", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const types = ["string", "number", "boolean", "selector"];
+  const operators = [
+    "equals", "not_equals", "contains", "starts_with", "ends_with", "matches",
+    "gt", "gte", "lt", "lte", "is_true", "is_false", "exists", "not_exists",
+  ];
   try {
     await server.connect(serverTransport);
     await client.connect(clientTransport);
@@ -29,6 +33,7 @@ test("v0.21 selector variables and conditions are exposed and preserved by creat
       const props = tool.inputSchema.properties as Record<string, any>;
       assert.deepEqual(props.variables.additionalProperties.properties.type.enum, types);
       assert.deepEqual(props.actions.items.properties.conditionVarType.enum, types);
+      assert.deepEqual(props.actions.items.properties.conditionOp.enum, operators);
     }
 
     const resource = await client.readResource({ uri: "figranium://schemas/task-v1.json" });
@@ -37,9 +42,10 @@ test("v0.21 selector variables and conditions are exposed and preserved by creat
     const schema = JSON.parse(entry.text);
     assert.deepEqual(schema.properties.variables.additionalProperties.properties.type.enum, types);
     assert.deepEqual(schema.properties.actions.items.properties.conditionVarType.enum, types);
+    assert.deepEqual(schema.properties.actions.items.properties.conditionOp.enum, operators);
 
     const actions = [
-      { type: "if", conditionVar: "target", conditionVarType: "selector", conditionOp: "exists" },
+      { type: "if", selector: ".submit", conditionVarType: "selector", conditionOp: "exists" },
       { type: "end" },
     ];
     const variables = { target: { type: "selector", value: ".submit" } };
@@ -58,6 +64,7 @@ test("v0.21 selector variables and conditions are exposed and preserved by creat
       assert.equal(payload.variables.target.type, "selector");
       assert.equal(payload.variables.target.value, ".submit");
       assert.equal(payload.actions[0].conditionVarType, "selector");
+      assert.equal(payload.actions[0].selector, ".submit");
       assert.equal(payload.actions[0].conditionOp, "exists");
     }
   } finally {
