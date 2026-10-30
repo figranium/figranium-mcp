@@ -17,6 +17,7 @@ import {
 } from "@figranium/sdk";
 import { z } from "zod";
 import { getWorkflowBoundaryIssues } from "./workflow-validation.js";
+import { fetchAuthenticatedTemplate } from "./template-http.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1132,19 +1133,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }).parse(args || {});
         const params = new URLSearchParams({ limit: String(query.limit ?? 12), offset: String(query.offset ?? 0),
           sort: query.sort ?? "popular", category: query.category ?? "all", search: query.search ?? "" });
-        const response = await fetch(`${BASE_URL}/api/templates?${params}`, {
-          headers: { "x-api-key": API_KEY, accept: "application/json" }
-        });
-        if (!response.ok) throw new Error(`Template catalog request failed (${response.status})`);
-        return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
+        const catalog = await fetchAuthenticatedTemplate(`${BASE_URL}/api/templates?${params}`, API_KEY);
+        return { content: [{ type: "text", text: JSON.stringify(catalog, null, 2) }] };
       }
       case "template_get": {
         const { id } = z.object({ id: z.string().uuid() }).parse(args || {});
-        const response = await fetch(`${BASE_URL}/api/templates/${encodeURIComponent(id)}`, {
-          headers: { "x-api-key": API_KEY, accept: "application/json" }
-        });
-        if (!response.ok) throw new Error(`Template retrieval failed (${response.status})`);
-        return { content: [{ type: "text", text: JSON.stringify(await response.json(), null, 2) }] };
+        const template = await fetchAuthenticatedTemplate(`${BASE_URL}/api/templates/${encodeURIComponent(id)}`, API_KEY);
+        return { content: [{ type: "text", text: JSON.stringify(template, null, 2) }] };
       }
 
       case "create_task": {

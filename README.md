@@ -91,6 +91,8 @@ https://mcp.figranium.dev/mcp
 
 The hosted MCP handles OAuth and connects the client to a publicly reachable Figranium instance. For local clients, `npx -y figranium-mcp` is usually the simpler path and can connect directly to localhost.
 
+Authenticated template catalog requests reject HTTP redirects to prevent `x-api-key` credentials from reaching a redirected destination. Point `FIGRANIUM_BASE_URL` at the final API origin; do not rely on a reverse proxy's 3xx redirect.
+
 ## Environment variables
 
 | Variable | Required | Default | Description |
