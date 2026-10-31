@@ -119,21 +119,30 @@ export function issuerFromEnv(): string {
   return url.toString().replace(/\/+$/, "");
 }
 
-function authorizationSigningKey(): Buffer {
-  return crypto.createHmac("sha256", legacyKey()).update("figranium-oauth-authorization-state-v1").digest();
+function authorizationSigningKey(key: Buffer): Buffer {
+  return crypto.createHmac("sha256", key).update("figranium-oauth-authorization-state-v1").digest();
+}
+
+function stateSigningKey(): Buffer {
+  return useNewKey() ? newKey() : legacyKey();
 }
 
 export function signAuthorizationRequest(payload: Record<string, unknown>): string {
   const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  const sig = crypto.createHmac("sha256", authorizationSigningKey()).update(body).digest("base64url");
+  const sig = crypto.createHmac("sha256", authorizationSigningKey(stateSigningKey())).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 
 export function verifyAuthorizationRequest<T extends Record<string, unknown>>(token: string): T {
-  const [body, sig] = token.split(".");
-  if (!body || !sig) throw new Error("Invalid authorization request");
-  const expected = crypto.createHmac("sha256", authorizationSigningKey()).update(body).digest("base64url");
-  if (!timingSafeEqualStrings(expected, sig)) throw new Error("Invalid authorization request signature");
+  const [body, sig, extra] = token.split(".");
+  if (!body || !sig || extra) throw new Error("Invalid authorization request");
+  const matches = (key: Buffer) => {
+    const expected = crypto.createHmac("sha256", authorizationSigningKey(key)).update(body).digest("base64url");
+    return timingSafeEqualStrings(expected, sig);
+  };
+  const valid = matches(stateSigningKey()) ||
+    (useNewKey() && !!process.env.FIGRANIUM_OAUTH_ENCRYPTION_KEY && matches(legacyKey()));
+  if (!valid) throw new Error("Invalid authorization request signature");
   const parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as T;
   const exp = Number(parsed.exp ?? 0);
   if (!Number.isFinite(exp) || exp < Math.floor(Date.now()/1000)) throw new Error("Authorization request expired");

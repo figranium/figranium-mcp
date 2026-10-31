@@ -1,15 +1,19 @@
-# OAuth encryption-key migration
+# Migrate Figranium MCP OAuth encryption keys
 
-The original `FIGRANIUM_OAUTH_ENCRYPTION_KEY` remains the legacy key. Never replace it in Vercel until all legacy ciphertext is migrated.
+This procedure requires the old encryption key to remain set in Vercel. Never paste secrets into GitHub or chat.
 
-1. Add `FIGRANIUM_OAUTH_NEW_ENCRYPTION_KEY` in Vercel Production (a separate 32-byte key). Do not change the existing key.
-2. Deploy dual-key support and verify that existing OAuth access tokens still resolve. With no primary flag, new connections continue to use v1.
-3. Set `FIGRANIUM_OAUTH_KEY_PRIMARY=new` in Vercel Production and redeploy. New connections now use v2, while existing v1 records remain readable.
-4. Before any bulk rotation, take a Neon restore point, prevent older Vercel deployments from writing new v1 credentials, and verify the database's actual `oauth_connections(id,api_key_ciphertext)` schema.
-5. Run a separately authenticated, one-time server-side migration **inside the Vercel environment** that calls `reencryptLegacySecret` on each row and uses a compare-and-swap update (`WHERE id=$2 AND api_key_ciphertext=$3`). Never export plaintext, and do not expose a public migration endpoint without robust authentication and rate limiting.
-6. Verify zero remaining v1 records and decrypt a sample of v2 records. Set the same new key and `FIGRANIUM_OAUTH_KEY_PRIMARY=new` on Cloudflare; test OAuth and MCP before domain cutover.
-7. After cutover, remove legacy key dependencies only after all pending authorization requests signed by the legacy key have expired and existing connections have been verified.
+1. In Vercel Production, retain `FIGRANIUM_OAUTH_ENCRYPTION_KEY`. Add `FIGRANIUM_OAUTH_NEW_ENCRYPTION_KEY` (new 32-byte key). Deploy this change and verify existing MCP OAuth clients.
+2. Create a Neon restore point before rotating any records. Generate a separate admin token using `openssl rand -hex 32`. Add it to Vercel Production as `FIGRANIUM_OAUTH_MIGRATION_TOKEN`.
+3. Set `FIGRANIUM_OAUTH_KEY_PRIMARY=new` in Vercel Production, redeploy, and verify new OAuth connections work. New credentials now use v2. Authorization state is signed with the new key, while verification temporarily accepts old signatures.
+4. Invoke the migration only over HTTPS. Set `MIGRATION_TOKEN` in your local shell (read securely without echoing it) and run:
 
-Important: OAuth authorization state signing intentionally stays on the legacy key during transition, to avoid invalidating in-flight authorization requests. Before retiring the old key, migrate signing to an independently managed stable secret or a verified new-key strategy.
+   `curl --fail-with-body -sS -X POST -H "Authorization: Bearer ${MIGRATION_TOKEN}" https://mcp.figranium.dev/api/rotate-key`
 
-The `reencryptLegacySecret` function is a cryptographic migration primitive; this change does not execute a database migration or expose a migration endpoint.
+   Repeat until `remaining` is zero. Each invocation migrates at most 25 rows, with a conditional update to avoid overwriting concurrent changes. No API keys are returned. A failure stops the batch; investigate rather than retrying indefinitely.
+5. Confirm the count with a read-only Neon query: `SELECT count(*) FROM oauth_connections WHERE api_key_ciphertext LIKE 'v1.%';`. It must be zero. Check that there are no unknown ciphertext formats and verify live OAuth token refresh and MCP calls.
+6. Configure Cloudflare with `DATABASE_URL`, `FIGRANIUM_OAUTH_NEW_ENCRYPTION_KEY`, and `FIGRANIUM_OAUTH_KEY_PRIMARY=new`; test on workers.dev. The original encryption key is not required on Cloudflare after all v1 rows are migrated.
+7. Move the domain only after runtime validation. Remove the temporary `api/rotate-key.ts` endpoint and `FIGRANIUM_OAUTH_MIGRATION_TOKEN` after successful cutover.
+
+Do not delete the original key from Vercel until cutover is verified. Prevent older Vercel deployments from creating new v1 records during migration. Use a maintenance window if necessary.
+
+The endpoint is only accessible to holders of the migration token and is intentionally absent from the Cloudflare Worker routing table. Protect the token as a production administrator credential.
