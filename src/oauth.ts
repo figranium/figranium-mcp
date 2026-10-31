@@ -150,7 +150,10 @@ async function validateFigranium(baseUrl: string, apiKey: string) {
       redirect: "manual",
       signal: controller.signal,
     });
-    if (response.status >= 300 && response.status < 400 || response.type === "opaqueredirect") {\n      throw new Error("The Figranium instance redirected the API request; redirects are not allowed.");\n    }\n    if (!response.ok) {
+    if (response.status >= 300 && response.status < 400 || response.type === "opaqueredirect") {
+      throw new Error("The Figranium instance redirected the API request; redirects are not allowed.");
+    }
+    if (!response.ok) {
       throw new Error(
         response.status === 401 || response.status === 403
           ? "The API key was rejected by this Figranium instance."
