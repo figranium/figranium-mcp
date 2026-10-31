@@ -146,7 +146,7 @@ async function validateFigranium(baseUrl: string, apiKey: string) {
   const timer = setTimeout(() => controller.abort(), 8_000);
   try {
     const response = await fetch(`${baseUrl}${isCloudInstance(baseUrl) ? "/api/v1/tasks" : "/api/tasks"}`, {
-      headers: { accept: "application/json", "x-api-key": apiKey },
+      headers: { accept: "application/json", ...(isCloudInstance(baseUrl) ? { authorization: `Bearer ${apiKey}` } : { "x-api-key": apiKey }) },
       redirect: "manual",
       signal: controller.signal,
     });
