@@ -147,10 +147,10 @@ async function validateFigranium(baseUrl: string, apiKey: string) {
   try {
     const response = await fetch(`${baseUrl}${isCloudInstance(baseUrl) ? "/api/v1/tasks" : "/api/tasks"}`, {
       headers: { accept: "application/json", "x-api-key": apiKey },
-      redirect: "error",
+      redirect: "manual",
       signal: controller.signal,
     });
-    if (!response.ok) {
+    if (response.status >= 300 && response.status < 400 || response.type === "opaqueredirect") {\n      throw new Error("The Figranium instance redirected the API request; redirects are not allowed.");\n    }\n    if (!response.ok) {
       throw new Error(
         response.status === 401 || response.status === 403
           ? "The API key was rejected by this Figranium instance."
