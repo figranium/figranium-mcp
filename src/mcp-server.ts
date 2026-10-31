@@ -1248,7 +1248,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const response = cloudApi
           ? await (async () => {
               const res = await fetch(new URL("/api/v1/tasks", BASE_URL), {
-                headers: { authorization: `Bearer ${API_KEY}`, accept: "application/json" },
+                headers: { "x-api-key": API_KEY, accept: "application/json" },
                 redirect: "manual",
                 signal: AbortSignal.timeout(30_000),
               });
