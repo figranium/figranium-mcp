@@ -12,7 +12,7 @@ test("Cloud routes Task operations with scoped credentials and reports queued ex
     assert.equal(new Headers(init?.headers).get("x-api-key"), "test-key");
     requests.push({ path: url.pathname, method: init?.method || "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined });
     if (init?.method === "DELETE") return new Response(null, { status: 204 });
-    const result = url.pathname === "/api/v1/tasks" && !init?.body ? [{ id: "123", name: "Example" }] : url.pathname === "/api/executions" ? { executions: [] } : { id: "123", status: "queued" };
+    const result = url.pathname === "/api/v1/tasks" && !init?.body ? [{ id: "123", name: "Example", url: "https://example.com", mode: "agent", actions: [{type:"click", selector:"#go"}] }] : url.pathname === "/api/executions" ? { executions: [] } : { id: "123", status: "queued" };
     return Response.json(result);
   };
   const server = createFigraniumServer({ baseUrl: "https://cloud.figranium.dev", apiKey: "test-key" });
@@ -29,6 +29,8 @@ test("Cloud routes Task operations with scoped credentials and reports queued ex
     ] as const) assert.notEqual((await client.callTool({name, arguments: args})).isError, true, name);
     const rejected = await client.callTool({name:"task_execute", arguments:{taskId:"123", variables:{x:"y"}}});
     assert.equal(rejected.isError, true);
-    assert.deepEqual(requests.map(r => [r.method,r.path]), [["GET","/api/v1/tasks"],["POST","/api/v1/tasks"],["PUT","/api/v1/tasks/123"],["DELETE","/api/v1/tasks/123"],["POST","/api/v1/executions"],["GET","/api/executions"]]);
+    assert.equal(requests[3].body.actions[0].selector, "#go");
+    assert.equal(requests[3].body.name, "New");
+    assert.deepEqual(requests.map(r => [r.method,r.path]), [["GET","/api/v1/tasks"],["POST","/api/v1/tasks"],["GET","/api/v1/tasks"],["PUT","/api/v1/tasks/123"],["DELETE","/api/v1/tasks/123"],["POST","/api/v1/executions"],["GET","/api/executions"]]);
   } finally { await client.close(); await server.close(); globalThis.fetch = oldFetch; }
 });

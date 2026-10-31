@@ -1222,7 +1222,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         if (cloudApi && (updates.mode === "headful" || updates.schedule)) throw new Error("Headful Tasks and schedules are not supported in Figranium Cloud.");
-        const response = cloudApi ? await cloudRequest(`/api/v1/tasks/${encodeURIComponent(taskId)}`, "PUT", updates) : await figranium.tasks.update(taskId, updates as Parameters<typeof figranium.tasks.update>[1]);
+        let response: unknown;
+        if (cloudApi) {
+          // Cloud PUT replaces the entire Task. Load it first to preserve fields
+          // the caller did not ask to change.
+          const tasks = await cloudRequest("/api/v1/tasks");
+          if (!Array.isArray(tasks)) throw new Error("Unexpected Cloud task listing response");
+          const existing = tasks.find((task: any) => task.id === taskId);
+          if (!existing) throw new Error("Task not found or not accessible to this API key.");
+          const requestedUpdates = Object.fromEntries(Object.entries(updates).filter(([key]) => Object.hasOwn(args || {}, key)));
+          response = await cloudRequest(`/api/v1/tasks/${encodeURIComponent(taskId)}`, "PUT", { ...existing, ...requestedUpdates });
+        } else response = await figranium.tasks.update(taskId, updates as Parameters<typeof figranium.tasks.update>[1]);
         return {
           content: [
             {
