@@ -306,6 +306,15 @@ export async function handleOAuthHttpRequest(req: Req, res: ServerResponse) {
       return redirectError(res, redirectUri, state, "invalid_request", "PKCE S256 is required.");
     }
 
+    // A form-action CSP also governs redirects after a form POST in Chromium.
+    // Allow the exact registered OAuth callback origin, otherwise browsers can
+    // block our successful 302 back to the client after authorization.
+    const callbackOrigin = new URL(redirectUri).origin;
+    res.setHeader(
+      "Content-Security-Policy",
+      `default-src 'none'; style-src 'unsafe-inline' https://figranium.dev; font-src https://figranium.dev; img-src https://figranium.dev; form-action 'self' ${callbackOrigin}; frame-ancestors 'none'; base-uri 'none'`,
+    );
+
     const signed = signAuthorizationRequest({
       clientId,
       redirectUri,
