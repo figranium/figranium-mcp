@@ -782,6 +782,8 @@ function formatZodError(error: z.ZodError): string {
  * Helper to safely read AGENT_SPEC.md from disk
  */
 function readAgentSpec(): string {
+  const bundled = (globalThis as typeof globalThis & { __FIGRANIUM_AGENT_SPEC?: string }).__FIGRANIUM_AGENT_SPEC;
+  if (bundled) return bundled;
   const pathsToTry = [
     path.join(__dirname, "..", "AGENT_SPEC.md"),
     path.join(__dirname, "AGENT_SPEC.md"),
