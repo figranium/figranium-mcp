@@ -1241,7 +1241,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "task_list": {
-        const response = await figranium.tasks.listSummaries();
+        // Cloud exposes tenant-scoped tasks at /api/v1/tasks, not the
+        // self-hosted API-key-only /api/tasks/list endpoint.
+        const cloudApi = /(^|\\.)cloud\\.figranium\\.dev$/i.test(new URL(BASE_URL).hostname) ||
+          /figranium-cloud\\..*\\.workers\\.dev$/i.test(new URL(BASE_URL).hostname);
+        const response = cloudApi
+          ? await (async () => {
+              const res = await fetch(new URL("/api/v1/tasks", BASE_URL), {
+                headers: { authorization: `Bearer ${API_KEY}`, accept: "application/json" },
+                redirect: "manual",
+                signal: AbortSignal.timeout(30_000),
+              });
+              if (!res.ok) throw new Error(`Cloud task listing failed (HTTP ${res.status})`);
+              const tasks: unknown = await res.json();
+              if (!Array.isArray(tasks)) throw new Error("Unexpected Cloud task listing response");
+              return { tasks: tasks.map((task: any) => ({
+                id: String(task.id),
+                name: task.name || String(task.id),
+                ...(task.description ? { description: task.description } : {}),
+              })) };
+            })()
+          : await figranium.tasks.listSummaries();
         return {
           content: [
             {
