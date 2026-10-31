@@ -19,8 +19,6 @@ import { z } from "zod";
 import { getWorkflowBoundaryIssues } from "./workflow-validation.js";
 import { fetchAuthenticatedTemplate } from "./template-http.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export interface FigraniumServerConfig {
   baseUrl: string;
@@ -784,9 +782,12 @@ function formatZodError(error: z.ZodError): string {
 function readAgentSpec(): string {
   const bundled = (globalThis as typeof globalThis & { __FIGRANIUM_AGENT_SPEC?: string }).__FIGRANIUM_AGENT_SPEC;
   if (bundled) return bundled;
+  // Workers provide the spec via __FIGRANIUM_AGENT_SPEC. Avoid resolving
+  // import.meta.url at module initialization: bundled Workers may omit it.
+  const moduleUrl = import.meta.url;
+  const moduleDirectory = moduleUrl ? path.dirname(fileURLToPath(moduleUrl)) : undefined;
   const pathsToTry = [
-    path.join(__dirname, "..", "AGENT_SPEC.md"),
-    path.join(__dirname, "AGENT_SPEC.md"),
+    ...(moduleDirectory ? [path.join(moduleDirectory, "..", "AGENT_SPEC.md"), path.join(moduleDirectory, "AGENT_SPEC.md")] : []),
     path.join(process.cwd(), "AGENT_SPEC.md")
   ];
   for (const p of pathsToTry) {
