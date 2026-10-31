@@ -1,32 +1,68 @@
 import crypto from "node:crypto";
 import net from "node:net";
 
-const VERSION = "v1";
+const LEGACY_VERSION = "v1";
+const NEW_VERSION = "v2";
 
-function secretKey(): Buffer {
-  const raw = process.env.FIGRANIUM_OAUTH_ENCRYPTION_KEY?.trim();
-  if (!raw) throw new Error("FIGRANIUM_OAUTH_ENCRYPTION_KEY is required");
-  const hex = /^[0-9a-f]{64}$/i.test(raw) ? Buffer.from(raw, "hex") : undefined;
-  const base64 = !hex ? Buffer.from(raw, "base64") : undefined;
-  const key = hex ?? base64!;
-  if (key.length !== 32) throw new Error("FIGRANIUM_OAUTH_ENCRYPTION_KEY must decode to exactly 32 bytes");
+function decodeKey(raw: string | undefined, name: string): Buffer {
+  if (!raw?.trim()) throw new Error(`${name} is required`);
+  const input = raw.trim();
+  const key = /^[0-9a-f]{64}$/i.test(input) ? Buffer.from(input, "hex") : Buffer.from(input, "base64");
+  if (key.length !== 32) throw new Error(`${name} must decode to exactly 32 bytes`);
   return key;
 }
 
-export function encryptSecret(plaintext: string): string {
+function legacyKey(): Buffer {
+  return decodeKey(process.env.FIGRANIUM_OAUTH_ENCRYPTION_KEY, "FIGRANIUM_OAUTH_ENCRYPTION_KEY");
+}
+
+function newKey(): Buffer {
+  return decodeKey(process.env.FIGRANIUM_OAUTH_NEW_ENCRYPTION_KEY, "FIGRANIUM_OAUTH_NEW_ENCRYPTION_KEY");
+}
+
+function useNewKey(): boolean {
+  return process.env.FIGRANIUM_OAUTH_KEY_PRIMARY === "new";
+}
+
+function seal(plaintext: string, key: Buffer, version: string): string {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", secretKey(), iv);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
-  return [VERSION, iv.toString("base64url"), tag.toString("base64url"), ciphertext.toString("base64url")].join(".");
+  return [version, iv.toString("base64url"), tag.toString("base64url"), ciphertext.toString("base64url")].join(".");
+}
+
+function open(value: string, key: Buffer): string {
+  const [version, ivRaw, tagRaw, cipherRaw, extra] = value.split(".");
+  if ((version !== LEGACY_VERSION && version !== NEW_VERSION) || !ivRaw || !tagRaw || !cipherRaw || extra) {
+    throw new Error("Unsupported encrypted secret format");
+  }
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(ivRaw, "base64url"));
+  decipher.setAuthTag(Buffer.from(tagRaw, "base64url"));
+  return Buffer.concat([decipher.update(Buffer.from(cipherRaw, "base64url")), decipher.final()]).toString("utf8");
+}
+
+export function encryptSecret(plaintext: string): string {
+  return useNewKey() ? seal(plaintext, newKey(), NEW_VERSION) : seal(plaintext, legacyKey(), LEGACY_VERSION);
 }
 
 export function decryptSecret(value: string): string {
-  const [version, ivRaw, tagRaw, cipherRaw] = value.split(".");
-  if (version !== VERSION || !ivRaw || !tagRaw || !cipherRaw) throw new Error("Unsupported encrypted secret format");
-  const decipher = crypto.createDecipheriv("aes-256-gcm", secretKey(), Buffer.from(ivRaw, "base64url"));
-  decipher.setAuthTag(Buffer.from(tagRaw, "base64url"));
-  return Buffer.concat([decipher.update(Buffer.from(cipherRaw, "base64url")), decipher.final()]).toString("utf8");
+  if (value.startsWith(NEW_VERSION + ".")) return open(value, newKey());
+  if (value.startsWith(LEGACY_VERSION + ".")) return open(value, legacyKey());
+  throw new Error("Unsupported encrypted secret format");
+}
+
+export function reencryptLegacySecret(value: string): string | undefined {
+  if (!useNewKey()) throw new Error("New encryption key must be primary before rotation");
+  if (value.startsWith(NEW_VERSION + ".")) {
+    open(value, newKey());
+    return undefined;
+  }
+  if (!value.startsWith(LEGACY_VERSION + ".")) throw new Error("Unsupported encrypted secret format");
+  const plaintext = open(value, legacyKey());
+  const rotated = seal(plaintext, newKey(), NEW_VERSION);
+  if (open(rotated, newKey()) !== plaintext) throw new Error("Key rotation verification failed");
+  return rotated;
 }
 
 export function hashOpaqueSecret(value: string): string {
@@ -84,7 +120,7 @@ export function issuerFromEnv(): string {
 }
 
 function authorizationSigningKey(): Buffer {
-  return crypto.createHmac("sha256", secretKey()).update("figranium-oauth-authorization-state-v1").digest();
+  return crypto.createHmac("sha256", legacyKey()).update("figranium-oauth-authorization-state-v1").digest();
 }
 
 export function signAuthorizationRequest(payload: Record<string, unknown>): string {
