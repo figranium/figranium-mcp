@@ -28,6 +28,21 @@ export interface FigraniumServerConfig {
 export function createFigraniumServer({ baseUrl, apiKey }: FigraniumServerConfig) {
   const BASE_URL = baseUrl.replace(/\/+$/, "");
   const API_KEY = apiKey;
+  const host = new URL(BASE_URL).hostname.toLowerCase();
+  const cloudApi = host === "cloud.figranium.dev" || host.endsWith(".cloud.figranium.dev") || /^figranium-cloud\.[a-z0-9-]+\.workers\.dev$/.test(host);
+  async function cloudRequest(endpoint: string, method = "GET", body?: unknown): Promise<any> {
+    const response = await fetch(new URL(endpoint, BASE_URL), {
+      method, headers: { "x-api-key": API_KEY, accept: "application/json", ...(body === undefined ? {} : { "content-type": "application/json" }) },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      redirect: "manual", signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Cloud API returned HTTP ${response.status}: ${detail.slice(0, 500)}`);
+    }
+    return response.status === 204 ? { success: true } : response.json();
+  }
+
 
   // Use the official SDK for all communication with the Figranium API.
   const figranium = new Figranium({
@@ -906,7 +921,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "task_execute",
         annotations: { title: "Execute Task", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-        description: "Execute a saved automation task by ID and return its real run result. This is also useful for validating newly created or updated tasks against actual browser behavior and output.",
+        description: cloudApi ? "Queue a Cloud Task execution. Returns an execution ID and queued status; use execution_list to inspect its result later. Variable overrides are not supported." : "Execute a saved automation task by ID and return its real run result. This is also useful for validating newly created or updated tasks against actual browser behavior and output.",
         inputSchema: {
           type: "object",
           properties: {
@@ -1115,7 +1130,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["name"],
         },
       },
-    ],
+    ].filter(tool => !cloudApi || (!tool.name.startsWith("schedule_") && tool.name !== "list_cabinets" && tool.name !== "create_cabinet")),
   };
 });
 
@@ -1126,6 +1141,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
+    if (cloudApi && (name.startsWith("schedule_") || name === "list_cabinets" || name === "create_cabinet")) {
+      throw new Error("This operation is not currently supported through Figranium Cloud API keys.");
+    }
     switch (name) {
       case "template_search": {
         const query = z.object({
@@ -1162,7 +1180,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const taskPayload = parseResult.data;
 
-        const response = await figranium.tasks.save(taskPayload as Parameters<typeof figranium.tasks.save>[0]);
+        if (cloudApi && (taskPayload.mode === "headful" || taskPayload.schedule)) throw new Error("Headful Tasks and schedules are not supported in Figranium Cloud.");
+        const response = cloudApi ? await cloudRequest("/api/v1/tasks", "POST", taskPayload) : await figranium.tasks.save(taskPayload as Parameters<typeof figranium.tasks.save>[0]);
         return {
           content: [
             {
@@ -1202,7 +1221,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        const response = await figranium.tasks.update(taskId, updates as Parameters<typeof figranium.tasks.update>[1]);
+        if (cloudApi && (updates.mode === "headful" || updates.schedule)) throw new Error("Headful Tasks and schedules are not supported in Figranium Cloud.");
+        const response = cloudApi ? await cloudRequest(`/api/v1/tasks/${encodeURIComponent(taskId)}`, "PUT", updates) : await figranium.tasks.update(taskId, updates as Parameters<typeof figranium.tasks.update>[1]);
         return {
           content: [
             {
@@ -1229,7 +1249,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const { taskId } = parseResult.data;
 
-        const response = await figranium.tasks.delete(taskId);
+        const response = cloudApi ? await cloudRequest(`/api/v1/tasks/${encodeURIComponent(taskId)}`, "DELETE") : await figranium.tasks.delete(taskId);
         return {
           content: [
             {
@@ -1241,26 +1261,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "task_list": {
-        // Cloud exposes tenant-scoped tasks at /api/v1/tasks, not the
-        // self-hosted API-key-only /api/tasks/list endpoint.
-        const cloudApi = /(^|\\.)cloud\\.figranium\\.dev$/i.test(new URL(BASE_URL).hostname) ||
-          /figranium-cloud\\..*\\.workers\\.dev$/i.test(new URL(BASE_URL).hostname);
         const response = cloudApi
-          ? await (async () => {
-              const res = await fetch(new URL("/api/v1/tasks", BASE_URL), {
-                headers: { "x-api-key": API_KEY, accept: "application/json" },
-                redirect: "manual",
-                signal: AbortSignal.timeout(30_000),
-              });
-              if (!res.ok) throw new Error(`Cloud task listing failed (HTTP ${res.status})`);
-              const tasks: unknown = await res.json();
-              if (!Array.isArray(tasks)) throw new Error("Unexpected Cloud task listing response");
-              return { tasks: tasks.map((task: any) => ({
-                id: String(task.id),
-                name: task.name || String(task.id),
-                ...(task.description ? { description: task.description } : {}),
-              })) };
-            })()
+          ? { tasks: (await cloudRequest("/api/v1/tasks")).map((task: any) => ({ id: String(task.id), name: task.name || String(task.id), ...(task.description ? { description: task.description } : {}) })) }
           : await figranium.tasks.listSummaries();
         return {
           content: [
@@ -1282,16 +1284,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new McpError(ErrorCode.InvalidParams, "taskId is required");
         }
 
-        // Browser automations routinely run longer than the SDK's default 30-second
-        // request timeout. Keep this request alive until Figranium returns the real
-        // execution result; MCP clients can apply their own cancellation/timeout.
-        const response = await figranium.runTask(
-          taskId,
-          {
-            variables: variables || {},
-          },
-          { timeoutMs: 0 },
-        );
+        if (cloudApi && variables && Object.keys(variables).length) throw new Error("Execution variable overrides are not currently supported by Figranium Cloud; no execution was started.");
+        const response = cloudApi
+          ? await cloudRequest("/api/v1/executions", "POST", { taskId })
+          : await figranium.runTask(taskId, { variables: variables || {} }, { timeoutMs: 0 });
 
         return {
           content: [
@@ -1304,7 +1300,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "execution_list": {
-        const response = await figranium.executions.list();
+        const response = cloudApi ? await cloudRequest("/api/executions") : await figranium.executions.list();
         return {
           content: [
             {
