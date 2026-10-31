@@ -124,9 +124,10 @@ const server = new Server(
   {
     name: "figranium-mcp-server",
     version: "1.6.0",
-    description: "Figranium MCP Server - Facilitates complete task creation, execution, schedule, and automation tracking.\n\n" + SYSTEM_INSTRUCTIONS,
+    description: "Connect your AI assistant to Figranium to create and manage browser automation Tasks, run them, explore templates, and review Executions. Available features depend on your Figranium deployment and API key permissions.",
   },
   {
+    instructions: SYSTEM_INSTRUCTIONS,
     capabilities: {
       tools: {},
       resources: {},
