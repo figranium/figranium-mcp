@@ -44,7 +44,18 @@ export default {
   async fetch(request, env, ctx) {
     const path = new URL(request.url).pathname;
     if (path === "/" || path === "/index.html") {
-      return env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
+      const assetUrl = new URL("/", request.url);
+      const assetReq = new Request(assetUrl, request);
+      const res = await env.ASSETS.fetch(assetReq);
+      if (res.status === 307 || res.status === 308) {
+        // If ASSETS redirects / to / or similar, fetch /index.html directly or handle redirect
+        const loc = res.headers.get("location");
+        if (loc === "/" || loc === assetUrl.pathname || loc === assetUrl.href) {
+          // Serve index.html without trailing slash redirect loop
+          return env.ASSETS.fetch(request);
+        }
+      }
+      return res;
     }
     if (!oauthPaths.has(path) && path !== "/mcp") {
       return new Response("Not found", { status: 404 });
