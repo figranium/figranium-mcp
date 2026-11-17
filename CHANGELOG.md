@@ -1,6 +1,15 @@
 # Changelog
 
-## [1.6.0] - 2026-10-25
+## [1.6.0] - 2026-11-16
+
+### Added
+
+- Added `folate_resolve` (`POST /api/folate/resolve`) and `folate_status` (`GET /api/folate/status`) MCP tools for neural DOM selector resolution.
+- Updated MCP instructions, task schemas, `AGENT_SPEC.md`, and OpenCode integration to use Folate when finding selectors.
+
+### Changed
+
+- Removed `headful` browser mode from MCP task schemas, tool descriptions, and Cloud guards.
 
 ### Fixed
 

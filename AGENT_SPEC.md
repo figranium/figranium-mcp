@@ -47,7 +47,7 @@ navigate, click, type, wait, wait_selector, wait_downloads, press, scroll, javas
 ```
 
 Common fields:
-- `selector` (string): CSS selector used by click/hover/scroll/foreach.
+- `selector` (string): CSS selector, XPath, Playwright selector, coordinates (`x,y`), or natural-language element description (automatically resolved via Folate, or prefixed with `folate:` / `ai:`) used by click/hover/scroll/foreach.
 - `value` (string): payload for type/wait/scroll/javascript/start.
 - `key` (string): key for `press` (e.g., `Enter`).
 - `disabled` (boolean): skip action.

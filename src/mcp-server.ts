@@ -30,17 +30,26 @@ export function createFigraniumServer({ baseUrl, apiKey }: FigraniumServerConfig
   const API_KEY = apiKey;
   const host = new URL(BASE_URL).hostname.toLowerCase();
   const cloudApi = host === "cloud.figranium.dev" || host.endsWith(".cloud.figranium.dev") || /^figranium-cloud\.[a-z0-9-]+\.workers\.dev$/.test(host);
-  async function cloudRequest(endpoint: string, method = "GET", body?: unknown): Promise<any> {
+  async function apiRequest(endpoint: string, method = "GET", body?: unknown, timeoutMs = 30_000): Promise<any> {
     const response = await fetch(new URL(endpoint, BASE_URL), {
-      method, headers: { "x-api-key": API_KEY, accept: "application/json", ...(body === undefined ? {} : { "content-type": "application/json" }) },
+      method,
+      headers: {
+        "x-api-key": API_KEY,
+        accept: "application/json",
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+      },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      redirect: "manual", signal: AbortSignal.timeout(30_000),
+      redirect: "manual",
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {
       const detail = await response.text();
-      throw new Error(`Cloud API returned HTTP ${response.status}: ${detail.slice(0, 500)}`);
+      throw new Error(`Figranium API returned HTTP ${response.status}: ${detail.slice(0, 500)}`);
     }
     return response.status === 204 ? { success: true } : response.json();
+  }
+  async function cloudRequest(endpoint: string, method = "GET", body?: unknown): Promise<any> {
+    return apiRequest(endpoint, method, body);
   }
 
 
@@ -71,10 +80,9 @@ Every task follows a strict execution pipeline that you must carefully construct
    - Empty, malformed, irrelevant, duplicated, or unexpectedly null output indicates that the task may need correction and another validation run.
 
 3. TASK CREATION AND DESIGN:
-   - A task must have a 'name', an initial starting 'url', and an execution 'mode' ('scrape', 'agent', or 'headful').
+   - A task must have a 'name', an initial starting 'url', and an execution 'mode' ('scrape' or 'agent').
    - Use 'agent' mode by default, including for scraping tasks. Agent mode supports the 'actions' array and should be chosen for nearly all browser automation and extraction workflows.
    - 'scrape' mode does NOT support action blocks. Use it only for exceptional cases that require extremely fast, action-free scraping.
-   - Use 'headful' mode for visible, interactive debug sessions.
    - Prefer the simplest native Figranium workflow that reliably satisfies the request.
    - Do not add actions that duplicate task-level behavior. In particular, do not add duplicate On Execution/start, wait, or navigate actions when the task-level start/navigation/wait behavior already performs that job.
    - A Timed Wait ('wait') can never be the first action: it would delay every execution without waiting for a concrete event. Put that fixed initial delay in the task-level 'wait' field instead.
@@ -101,9 +109,11 @@ Every task follows a strict execution pipeline that you must carefully construct
    - Values that depend on execution time, such as 'today', 'last 7 days', or 'past 90 days', must remain dynamic.
    - Do not hard-code the date observed while creating the task unless the user explicitly requests a fixed date.
 
-7. TARGET SELECTOR RESOLUTION:
-   - Prefer highly resilient selector strategies: ID-based selectors, robust CSS classes, XPath, ARIA roles, or reliable text matchers.
-   - Avoid brittle, highly nested selectors that break easily.
+7. TARGET SELECTOR RESOLUTION (FOLATE):
+   - Always use Folate when finding selectors instead of guessing or fabricating CSS/XPath selectors from memory.
+   - When you have page HTML (e.g. from an execution with 'includeHtml: true' or 'get_content'), call 'folate_resolve' (POST /api/folate/resolve) to ground a natural-language element description into ranked CSS/XPath selectors; use 'folate_status' (GET /api/folate/status) to verify Folate availability.
+   - When page HTML is not yet available, pass a natural-language element description (or explicit 'folate:' / 'ai:' prefix) in the action's 'selector' (or 'targetSelector') field so Figranium resolves it via Folate at runtime.
+   - Explicit CSS selectors, XPath, ARIA roles, Playwright selectors, or coordinates ('x,y') are also supported when exact selectors are already known or returned by 'folate_resolve'.
    - For nested elements, check whether they reside inside Shadow DOMs and set 'includeShadowDom' appropriately.
 
 8. USER INTENT:
@@ -224,7 +234,7 @@ const CreateTaskSchema = z.object({
   name: z.string().describe("Descriptive name of the automation task. Expected type: string. Example: 'Lead Extractor'"),
   description: z.string().optional().describe("Detailed description of what the task automates. Expected type: string. Example: 'Logs in and extracts weekly leads'"),
   url: z.string().describe("Initial URL to navigate to when the task starts. Expected type: string. Example: 'https://news.ycombinator.com'"),
-  mode: z.enum(['scrape', 'agent', 'headful']).describe("Execution mode. Use 'agent' by default, including for scraping, because it supports action blocks. 'scrape' does not support action blocks and is only for exceptional, extremely fast action-free scraping. 'headful' runs in a visible browser window. Expected type: string enum. Example: 'agent'"),
+  mode: z.enum(['scrape', 'agent']).describe("Execution mode. Use 'agent' by default, including for scraping, because it supports action blocks. 'scrape' does not support action blocks and is only for exceptional, extremely fast action-free scraping. Expected type: string enum. Example: 'agent'"),
   wait: z.number().default(3).describe("Standard delay in seconds to wait after navigation and page loads. Expected type: number. Example: 5"),
   selector: z.string().optional().describe("Default CSS selector to wait for on the page load before starting actions. Expected type: string. Example: '.main-content'"),
   rotateUserAgents: z.boolean().default(false).describe("Rotate user agents across requests to avoid pattern blocking. Expected type: boolean. Example: true"),
@@ -232,7 +242,7 @@ const CreateTaskSchema = z.object({
   rotateViewport: z.boolean().default(false).describe("Vary viewport resolutions randomly to simulate multiple devices. Expected type: boolean. Example: true"),
   humanTyping: z.boolean().default(false).describe("Vary typing speeds to simulate organic human typing. Expected type: boolean. Example: true"),
   stealth: StealthConfigSchema.optional().describe("Realistic human behavior configurations. Expected type: object."),
-  actions: WorkflowActionsSchema.default([]).describe("Sequential list of browser actions/control flow steps to execute. Timed Wait and Navigate To cannot be the first action; Get Content cannot be the final action. Action blocks require 'agent' or 'headful' mode and are not supported in 'scrape' mode. Expected type: array of action objects."),
+  actions: WorkflowActionsSchema.default([]).describe("Sequential list of browser actions/control flow steps to execute. Timed Wait and Navigate To cannot be the first action; Get Content cannot be the final action. Action blocks require 'agent' mode and are not supported in 'scrape' mode. Expected type: array of action objects."),
   variables: z.record(z.string(), VariableSchema).default({}).describe("Task INPUT variables and caller-overridable configuration only. Do not declare output-only fields or transient runtime state here. Use Set Variable for mid-task state. Expected type: record object of variable configurations."),
   extractionScript: z.string().optional().describe("Post-execution extraction script for the task's actual final output. Final structured fields, lists, tables, parsing, and extraction logic belong here rather than in task variables or JavaScript action blocks. Expected type: string. Example: 'return Array.from(document.querySelectorAll(\"a\")).map(el => el.href)'"),
   extractionFormat: z.enum(['json', 'csv']).optional().default('json').describe("Target export format of any extracted data. Expected type: string enum. Example: 'json'"),
@@ -241,7 +251,7 @@ const CreateTaskSchema = z.object({
   disableRecording: z.boolean().optional().default(false).describe("Disable video/VNC recording of this task to save storage. Expected type: boolean. Example: true"),
   statelessExecution: z.boolean().optional().describe("Deprecated legacy compatibility flag. Use cookieStateId: null for a fresh browser state."),
   translation: z.object({
-    enabled: z.boolean().describe("Enable rendered-page translation for Agent and headful runs. Expected type: boolean. Example: true"),
+    enabled: z.boolean().describe("Enable rendered-page translation for Agent runs. Expected type: boolean. Example: true"),
     targetLanguage: z.string().describe("translate.js target language name. Expected type: string. Example: 'spanish'")
   }).optional().describe("Optional page translation. It is disabled by default and is not available in Scrape mode."),
   cookieStateId: z.string().nullable().optional().describe("Existing named cookie state ID; null starts fresh, omitted uses the instance default (Figranium v0.21+)."),
@@ -265,6 +275,13 @@ const TaskUpdateSchema = CreateTaskSchema.partial().extend({
   });
 }).describe("A partial update for an existing Figranium task. taskId identifies the stored task; supply one or more mutable task fields to change.");
 
+const FolateResolveSchema = z.object({
+  query: z.string().trim().min(1, "query is required").max(1000, "query must be at most 1000 characters").describe("Natural-language description of the target DOM element. Expected type: string. Example: 'click Search Flights button'"),
+  html: z.string().max(5 * 1024 * 1024, "html exceeds 5MB limit").refine((value) => value.trim().length > 0, "html must not be empty").describe("Raw HTML of the target page to rank DOM elements against. Expected type: string."),
+  topK: z.number().int().min(1).max(20).optional().describe("Number of top candidate selector matches to return (1-20, default 3). Expected type: integer."),
+  maxCandidates: z.number().int().min(1).max(200).optional().describe("Maximum number of interactive DOM candidates to evaluate (1-200, default 48). Expected type: integer."),
+}).describe("Payload for resolving a natural-language element description into ranked CSS/XPath selectors via Folate.");
+
 /**
  * Rich formatted JSON Schema of a Figranium Task
  */
@@ -286,8 +303,8 @@ const TASK_JSON_SCHEMA = {
     },
     mode: {
       type: "string",
-      enum: ["scrape", "agent", "headful"],
-      description: "Execution mode. Use 'agent' by default, including for scraping, because it supports action blocks. 'scrape' does not support action blocks and is only for exceptional, extremely fast action-free scraping. 'headful' runs in a visible browser window with human oversight. Expected type: string enum. Example: 'agent'"
+      enum: ["scrape", "agent"],
+      description: "Execution mode. Use 'agent' by default, including for scraping, because it supports action blocks. 'scrape' does not support action blocks and is only for exceptional, extremely fast action-free scraping. Expected type: string enum. Example: 'agent'"
     },
     wait: {
       type: "number",
@@ -366,7 +383,7 @@ const TASK_JSON_SCHEMA = {
     },
     actions: {
       type: "array",
-      description: "Sequential list of browser actions/control flow steps to execute. Timed Wait and Navigate To cannot be the first action because task-level wait and url define the starting state; Get Content cannot be the final action because its result must feed a later action or extractionScript. Action blocks require 'agent' or 'headful' mode and are not supported in 'scrape' mode. Note: Variable references MUST use '{$variable_name}' syntax.",
+      description: "Sequential list of browser actions/control flow steps to execute. Timed Wait and Navigate To cannot be the first action because task-level wait and url define the starting state; Get Content cannot be the final action because its result must feed a later action or extractionScript. Action blocks require 'agent' mode and are not supported in 'scrape' mode. Note: Variable references MUST use '{$variable_name}' syntax.",
       items: {
         type: "object",
         description: "Represents a discrete automation step or flow-control operation executed in sequence. Variable reference MUST use '{$variable_name}' syntax.",
@@ -388,7 +405,7 @@ const TASK_JSON_SCHEMA = {
           },
           selector: {
             type: "string",
-            description: "CSS selector, XPath, or ARIA locator for the target element. Required for click, type, hover, wait_selector. Expected type: string. Example: '#username'"
+            description: "CSS selector, XPath, ARIA locator, coordinates ('x,y'), or natural-language element description (automatically resolved via Folate, or prefixed with 'folate:' / 'ai:') for the target element. Required for click, type, hover, wait_selector. Expected type: string. Example: '#username'"
           },
           value: {
             type: "string",
@@ -531,7 +548,7 @@ const TASK_JSON_SCHEMA = {
     },
     translation: {
       type: "object",
-      description: "Optional page translation for Agent and headful runs. It is disabled by default and is not available in Scrape mode.",
+      description: "Optional page translation for Agent runs. It is disabled by default and is not available in Scrape mode.",
       properties: {
         enabled: { type: "boolean", description: "Enable rendered-page translation. Expected type: boolean. Example: true" },
         targetLanguage: { type: "string", description: "translate.js target language name. Expected type: string. Example: 'spanish'" }
@@ -661,7 +678,7 @@ Use this after \`task_list\` identifies the task to modify—for example, to cor
 
 ### Important update behavior
 - For compound fields—\`actions\`, \`variables\`, \`stealth\`, \`translation\`, and \`schedule\`—send complete values, not nested fragments. When changing either \`actions\` or \`variables\`, ALWAYS supply BOTH complete fields together. An incomplete pair is rejected before saving to prevent accidentally clearing the existing workflow.
-- \`actions\` are an ordered replacement sequence. Use \`agent\` or \`headful\` mode for actions; \`scrape\` mode does not support them. Close every \`if\`, \`while\`, \`repeat\`, or \`foreach\` block with an \`end\` action.
+- \`actions\` are an ordered replacement sequence. Use \`agent\` mode for actions; \`scrape\` mode does not support them. Close every \`if\`, \`while\`, \`repeat\`, or \`foreach\` block with an \`end\` action.
 - A replacement sequence cannot start with Timed Wait or Navigate To: use task-level \`wait\` or \`url\` to establish the starting state. It also cannot end with Get Content: feed that value into a later action, or use \`extractionScript\` for final output.
 - Use \`{$variable_name}\` for task-variable references in URLs, headers, bodies, and action values. Do not use \`{{variable_name}}\` or \`\${variable_name}\`.
 - This tool changes saved configuration but does not run or delete a task. Use \`task_execute\` to validate an updated workflow and \`task_delete\` only when permanent removal is intended.
@@ -678,7 +695,7 @@ Create a complete, fully-configured Figranium automation task including sequenti
 ### !!! IMPORTANT GUIDELINES FOR LLM AGENTS !!!
 1. **VARIABLE TEMPLATING SYNTAX**: You MUST use \`{$variable_name}\` (with a single curly brace and dollar sign, e.g. \`{$myVar}\`) for variable references/templating inside action values, URLs, headers, or body fields. NEVER use double curly braces like \`{{variable_name}}\` or JavaScript-style templates like \`\${variable_name}\`, as these syntaxes are unsupported and will cause execution failures.
 2. **TASK VALIDATION**: Newly created or updated tasks are ordinarily intended to be validated against a real execution result so configuration, selectors, and extracted output can be checked.
-3. **MODE SELECTION**: Use \`agent\` mode by default, including for scraping tasks. \`scrape\` mode does not support action blocks and should be used only when extremely fast, action-free scraping is required. Use \`headful\` for visible interactive debugging.
+3. **MODE SELECTION**: Use \`agent\` mode by default, including for scraping tasks. \`scrape\` mode does not support action blocks and should be used only when extremely fast, action-free scraping is required.
 4. **WORKFLOW BOUNDARIES**: Timed Wait and Navigate To cannot be the first action. A fixed initial delay belongs in task-level \`wait\`, and the initial destination belongs in task-level \`url\`. Get Content cannot be the final action because its value needs a consuming action; use \`extractionScript\` for final structured output.
 
 ### 1. Purpose
@@ -712,12 +729,11 @@ Figranium tasks run as a linear sequence of steps defined in the 'actions' array
 - 'upload': Attach the newest unuploaded file, ZIP, or folder from a Cabinet (see 'cabinetId') to a file input, chooser, or drop target matching 'selector'.
 - 'finalize_uploads': Mark all Cabinet items attached during the execution as uploaded.
 
-### 4. Selector Strategy & Fallbacks
-When targeting elements, follow this hierarchy of selectors:
-1. Unique IDs (e.g., '#submit-button')
-2. ARIA roles and labels (e.g., '[aria-label="Search"]')
-3. Reliable CSS classes or data attributes (e.g., '.btn-primary', '[data-testid="login"]')
-4. Text matchers or XPath as a final resort.
+### 4. Selector Strategy & Folate Resolution
+When finding selectors for a task, use Folate instead of guessing brittle CSS/XPath selectors:
+1. Call 'folate_resolve' with the page HTML (for example, from an execution with 'includeHtml: true' or 'get_content') to resolve a natural-language query into ranked CSS/XPath selectors.
+2. Or pass a natural-language description (e.g., 'click Sign In button', or prefixed with 'folate:' / 'ai:') directly in 'selector' / 'targetSelector' for automatic runtime resolution via Folate.
+3. When exact selectors are already known or returned by 'folate_resolve', unique IDs/data attributes ('#submit-button', '[data-testid="login"]'), ARIA roles ('[aria-label="Search"]'), CSS classes, XPath, or coordinates ('x,y') are also supported.
 Fallback: If an element might be missing or slow to load, wrap the interaction inside an 'if' block evaluating a variable or use 'on_error' to catch failure.
 
 ### 5. Edge Cases & Retry Logic
@@ -1131,6 +1147,42 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["name"],
         },
       },
+      {
+        name: "folate_resolve",
+        annotations: { title: "Resolve Selector with Folate", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        description: "Resolve a natural-language element description against page HTML into ranked CSS/XPath selectors using Figranium's Folate endpoint (POST /api/folate/resolve). Use this instead of guessing brittle selectors or launching a headful browser session.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Natural-language description of the target DOM element (1-1000 chars). Example: 'click Search Flights button'",
+            },
+            html: {
+              type: "string",
+              description: "Raw HTML of the target page to rank interactive DOM elements against.",
+            },
+            topK: {
+              type: "number",
+              description: "Optional number of top candidate matches to return (integer 1-20, default 3).",
+            },
+            maxCandidates: {
+              type: "number",
+              description: "Optional maximum number of DOM candidates to evaluate (integer 1-200, default 48).",
+            },
+          },
+          required: ["query", "html"],
+        },
+      },
+      {
+        name: "folate_status",
+        annotations: { title: "Folate Status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        description: "Check whether the Folate neural DOM element ranker is available on the Figranium server (GET /api/folate/status).",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
     ].filter(tool => !cloudApi || (!tool.name.startsWith("schedule_") && tool.name !== "list_cabinets" && tool.name !== "create_cabinet")),
   };
 });
@@ -1181,7 +1233,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const taskPayload = parseResult.data;
 
-        if (cloudApi && (taskPayload.mode === "headful" || taskPayload.schedule)) throw new Error("Headful Tasks and schedules are not supported in Figranium Cloud.");
+        if (cloudApi && taskPayload.schedule) throw new Error("Schedules are not supported in Figranium Cloud.");
         const response = cloudApi ? await cloudRequest("/api/v1/tasks", "POST", taskPayload) : await figranium.tasks.save(taskPayload as Parameters<typeof figranium.tasks.save>[0]);
         return {
           content: [
@@ -1222,7 +1274,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        if (cloudApi && (updates.mode === "headful" || updates.schedule)) throw new Error("Headful Tasks and schedules are not supported in Figranium Cloud.");
+        if (cloudApi && updates.schedule) throw new Error("Schedules are not supported in Figranium Cloud.");
         let response: unknown;
         if (cloudApi) {
           // Cloud PUT replaces the entire Task. Load it first to preserve fields
@@ -1522,6 +1574,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new McpError(ErrorCode.InvalidParams, "name is required");
         }
         const response = await figranium.cabinets.create(cabinetName);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "folate_resolve": {
+        const parseResult = FolateResolveSchema.safeParse(args || {});
+        if (!parseResult.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: formatZodError(parseResult.error),
+              },
+            ],
+            isError: true,
+          };
+        }
+        const response = await apiRequest("/api/folate/resolve", "POST", parseResult.data, 60_000);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "folate_status": {
+        const response = await apiRequest("/api/folate/status", "GET", undefined, 15_000);
         return {
           content: [
             {

@@ -8,13 +8,13 @@
     "url": "https://github.com/figranium/figranium-mcp",
     "source": "github"
   },
-  "version": "1.5.2",
+  "version": "1.6.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "figranium-mcp",
-      "version": "1.5.2",
+      "version": "1.6.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
