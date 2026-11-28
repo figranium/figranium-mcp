@@ -140,7 +140,7 @@ Every task follows a strict execution pipeline that you must carefully construct
 const server = new Server(
   {
     name: "figranium-mcp-server",
-    version: "1.6.0",
+    version: "1.7.0",
     description: "Connect your AI assistant to Figranium to create and manage browser automation Tasks, run them, explore templates, and review Executions. Available features depend on your Figranium deployment and API key permissions.",
   },
   {
