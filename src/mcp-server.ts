@@ -18,6 +18,7 @@ import {
 import { z } from "zod";
 import { getWorkflowBoundaryIssues } from "./workflow-validation.js";
 import { fetchAuthenticatedTemplate } from "./template-http.js";
+import { callFrowseTool, getFrowseToolDefinitions, isFrowseTool } from "./frowse-tools.js";
 
 
 export interface FigraniumServerConfig {
@@ -116,11 +117,17 @@ Every task follows a strict execution pipeline that you must carefully construct
    - Explicit CSS selectors, XPath, ARIA roles, Playwright selectors, or coordinates ('x,y') are also supported when exact selectors are already known or returned by 'folate_resolve'.
    - For nested elements, check whether they reside inside Shadow DOMs and set 'includeShadowDom' appropriately.
 
-8. USER INTENT:
+8. LIVE BROWSER CONTROL (FROWSE):
+   - To explore or operate a site interactively (without authoring a Task), drive a persistent browser with the 'frowse_*' tools. Check 'frowse_status' first.
+   - Loop: 'frowse_open' -> 'frowse_snapshot' (compact summary, far cheaper than a DOM dump) -> act with 'frowse_click' / 'frowse_fill' / 'frowse_type' / 'frowse_select' / 'frowse_press' using plain-language element descriptions (Folate resolves them locally) -> verify with 'frowse_snapshot' or 'frowse_get' -> 'frowse_close' when done.
+   - Use 'frowse_query' to inspect ranked candidates when a description is ambiguous, and 'frowse_command' for any other action (tabs, frames, cookies, eval, uploads, dialogs).
+   - Use distinct 'session' names for independent browsers. Prefer snapshots over screenshots to save context. Once a flow works, convert it into a Task for repeatable, scheduled execution.
+
+9. USER INTENT:
    - Preserve intentional ambiguity when it represents a reasonable implementation choice.
    - Do not invent unnecessary requirements, but make sensible implementation decisions when needed to complete the task.
 
-9. EXECUTION HANDLING & MONITORING:
+10. EXECUTION HANDLING & MONITORING:
    - Execute tasks via 'task_execute', passing only genuine input variable overrides.
    - Runtime/transient state that is created mid-task should normally be created or updated with Set Variable rather than predeclared as a task input.
    - Track executions using 'execution_list' or stream results. If an execution or its result is wrong, inspect the task, fix the relevant source/action/selector/extraction logic, and retry.
@@ -1183,7 +1190,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
         },
       },
-    ].filter(tool => !cloudApi || (!tool.name.startsWith("schedule_") && tool.name !== "list_cabinets" && tool.name !== "create_cabinet")),
+      ...getFrowseToolDefinitions(),
+    ].filter(tool => !cloudApi || (!tool.name.startsWith("schedule_") && !tool.name.startsWith("frowse_") && tool.name !== "list_cabinets" && tool.name !== "create_cabinet")),
   };
 });
 
@@ -1196,6 +1204,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     if (cloudApi && (name.startsWith("schedule_") || name === "list_cabinets" || name === "create_cabinet")) {
       throw new Error("This operation is not currently supported through Figranium Cloud API keys.");
+    }
+    if (cloudApi && isFrowseTool(name)) {
+      throw new Error("Frowse browser sessions are not currently supported through Figranium Cloud API keys.");
+    }
+    if (isFrowseTool(name)) {
+      return await callFrowseTool(name, args as Record<string, any> | undefined, apiRequest);
     }
     switch (name) {
       case "template_search": {

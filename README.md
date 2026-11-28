@@ -148,3 +148,18 @@ FIGRANIUM_API_KEY=YOUR_API_KEY npx @modelcontextprotocol/inspector npx -y figran
 - [npm package](https://www.npmjs.com/package/figranium-mcp)
 - [MCP server source](https://github.com/figranium/figranium-mcp)
 - [Figranium source](https://github.com/figranium/figranium)
+
+## Frowse browser control
+
+With a Figranium server that has [Frowse](https://github.com/figranium/frowse) installed (`pip install frowse`), agents can drive a persistent browser directly, without authoring a Task:
+
+| Tool | Purpose |
+| :--- | :--- |
+| `frowse_status` / `frowse_sessions` / `frowse_close` | Availability, list sessions, close one or all |
+| `frowse_open`, `frowse_read`, `frowse_tab` | Navigate, read page text, manage tabs |
+| `frowse_snapshot`, `frowse_query` | Compact DOM summary; ranked Folate matches for a prompt |
+| `frowse_click`, `frowse_fill`, `frowse_type`, `frowse_press`, `frowse_select`, `frowse_hover`, `frowse_check`, `frowse_scroll` | Interact using natural-language descriptions, CSS, XPath, or `@eN` refs |
+| `frowse_get`, `frowse_wait`, `frowse_screenshot` | Read state, wait, capture an image |
+| `frowse_command` | Any other Frowse action (frames, cookies, storage, dialogs, eval, upload, pdf, ...) |
+
+Each tool maps to `POST /api/frowse/sessions/:session/commands` and requires an API key with `tasks:run` (status/list need `tasks:read`).
