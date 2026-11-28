@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added Frowse browser-session tools backed by Figranium's new `/api/frowse` routes so agents can drive a browser end to end: `frowse_status`, `frowse_open`, `frowse_snapshot`, `frowse_query`, `frowse_read`, `frowse_click`, `frowse_fill`, `frowse_type`, `frowse_press`, `frowse_select`, `frowse_hover`, `frowse_check`, `frowse_scroll`, `frowse_get`, `frowse_wait`, `frowse_screenshot`, `frowse_tab`, `frowse_sessions`, `frowse_close`, and the catch-all `frowse_command` (every Frowse action).
+- MCP instructions describe the open, snapshot, act, verify, close loop. Frowse tools are not exposed on Figranium Cloud API keys.
+
 ## [1.6.0] - 2026-11-16
 
 ### Added
